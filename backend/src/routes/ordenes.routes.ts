@@ -3,6 +3,7 @@ import { authMiddleware } from '../middleware/auth.js'
 import {
   crearOrden,
   agregarItem,
+  eliminarItem,
   obtenerOrden,
   listarOrdenes,
   cobrarOrden,
@@ -15,6 +16,7 @@ router.use(authMiddleware)
 
 router.post('/', crearOrden)
 router.post('/:id/items', agregarItem)
+router.delete('/:id/items/:itemId', eliminarItem)
 router.get('/:id', obtenerOrden)
 router.get('/', listarOrdenes)
 router.post('/:id/cobrar', cobrarOrden)

@@ -70,6 +70,40 @@ export const agregarItem = async (req: AuthRequest, res: Response) => {
   }
 }
 
+export const eliminarItem = async (req: AuthRequest, res: Response) => {
+  const ordenId = Number(req.params.id)
+  const itemId = Number(req.params.itemId)
+
+  try {
+    const orden = await prisma.orden.findFirst({
+      where: { id: ordenId, tenantId: req.tenantId }
+    })
+
+    if (!orden) {
+      res.status(404).json({ error: 'Orden no encontrada' })
+      return
+    }
+
+    if (orden.estado !== 'ABIERTA') {
+      res.status(400).json({ error: 'La orden no está abierta' })
+      return
+    }
+
+    const resultado = await prisma.ordenItem.deleteMany({
+      where: { id: itemId, ordenId }
+    })
+
+    if (resultado.count === 0) {
+      res.status(404).json({ error: 'Item no encontrado' })
+      return
+    }
+
+    res.json({ message: 'Item eliminado' })
+  } catch {
+    res.status(500).json({ error: 'Error al eliminar item' })
+  }
+}
+
 export const obtenerOrden = async (req: AuthRequest, res: Response) => {
   const id = Number(req.params.id)
 
