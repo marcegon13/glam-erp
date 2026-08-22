@@ -3,11 +3,14 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Recepcion from './pages/Recepcion'
 import Turnos from './pages/Turnos'
+import TurnosArchivados from './pages/TurnosArchivados'
+import Ausencias from './pages/Ausencias'
 import OrdenDetalle from './pages/OrdenDetalle'
 import Profesionales from './pages/Profesionales'
 import Servicios from './pages/Servicios'
 import Clientes from './pages/Clientes'
 import ClienteFicha from './pages/ClienteFicha'
+import Caja from './pages/Caja'
 import { authStore } from './store/auth'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -48,6 +51,22 @@ export default function App() {
           }
         />
         <Route
+          path="/turnos/archivados"
+          element={
+            <RequireAuth>
+              <TurnosArchivados />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/ausencias"
+          element={
+            <RequireAuth>
+              <Ausencias />
+            </RequireAuth>
+          }
+        />
+        <Route
           path="/ordenes/:id"
           element={
             <RequireAuth>
@@ -84,6 +103,14 @@ export default function App() {
           element={
             <RequireAuth>
               <ClienteFicha />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/caja"
+          element={
+            <RequireAuth>
+              <Caja />
             </RequireAuth>
           }
         />

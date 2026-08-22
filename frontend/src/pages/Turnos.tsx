@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import api from '../api/axios'
 
@@ -85,10 +86,19 @@ function armarMensajeWhatsapp(turno: Turno): string {
   )
 }
 
+type ModoFiltro = 'fecha' | 'cliente' | 'telefono' | 'profesionalFecha' | 'todos'
+
 export default function Turnos() {
+  const navigate = useNavigate()
+  const fechaInputRef = useRef<HTMLInputElement>(null)
+
   const [fecha, setFecha] = useState(hoyISO())
   const [profesionales, setProfesionales] = useState<Profesional[]>([])
   const [profesionalFiltro, setProfesionalFiltro] = useState('')
+
+  const [modoFiltro, setModoFiltro] = useState<ModoFiltro>('fecha')
+  const [clienteFiltroRapido, setClienteFiltroRapido] = useState('')
+  const [telefonoFiltroRapido, setTelefonoFiltroRapido] = useState('')
 
   const [turnos, setTurnos] = useState<Turno[]>([])
   const [cargando, setCargando] = useState(true)
@@ -103,7 +113,8 @@ export default function Turnos() {
   const [profesionalId, setProfesionalId] = useState('')
   const [fechaTurno, setFechaTurno] = useState(hoyISO())
   const [horaTurno, setHoraTurno] = useState('')
-  const [servicios, setServicios] = useState('')
+  const [serviciosEstilista, setServiciosEstilista] = useState('')
+  const [serviciosManicura, setServiciosManicura] = useState('')
   const [observaciones, setObservaciones] = useState('')
   const [creando, setCreando] = useState(false)
   const [errorModal, setErrorModal] = useState('')
@@ -127,13 +138,31 @@ export default function Turnos() {
   const fetchTurnos = async () => {
     setCargando(true)
     setError('')
+
+    let params: Record<string, string> = {}
+    if (modoFiltro === 'fecha') {
+      params = { fecha }
+    } else if (modoFiltro === 'profesionalFecha') {
+      params = { fecha, ...(profesionalFiltro ? { profesionalId: profesionalFiltro } : {}) }
+    } else if (modoFiltro === 'cliente') {
+      if (!clienteFiltroRapido.trim()) {
+        setTurnos([])
+        setCargando(false)
+        return
+      }
+      params = { cliente: clienteFiltroRapido }
+    } else if (modoFiltro === 'telefono') {
+      if (!telefonoFiltroRapido.trim()) {
+        setTurnos([])
+        setCargando(false)
+        return
+      }
+      params = { telefono: telefonoFiltroRapido }
+    }
+    // 'todos' -> sin params
+
     try {
-      const { data } = await api.get('/turnos', {
-        params: {
-          fecha,
-          ...(profesionalFiltro ? { profesionalId: profesionalFiltro } : {}),
-        },
-      })
+      const { data } = await api.get('/turnos', { params })
       setTurnos(data)
     } catch {
       setError('No se pudieron cargar los turnos')
@@ -147,8 +176,32 @@ export default function Turnos() {
   }, [])
 
   useEffect(() => {
+    if (modoFiltro === 'cliente' || modoFiltro === 'telefono') {
+      const timeout = setTimeout(fetchTurnos, 400)
+      return () => clearTimeout(timeout)
+    }
     fetchTurnos()
-  }, [fecha, profesionalFiltro])
+  }, [fecha, profesionalFiltro, modoFiltro, clienteFiltroRapido, telefonoFiltroRapido])
+
+  const activarModo = (modo: ModoFiltro) => {
+    setModoFiltro(modo)
+    if (modo === 'fecha') {
+      setTimeout(() => fechaInputRef.current?.showPicker?.(), 0)
+    }
+  }
+
+  const mostrarTodos = () => {
+    setModoFiltro('todos')
+    setClienteFiltroRapido('')
+    setTelefonoFiltroRapido('')
+  }
+
+  const BOTON_BASE =
+    'text-sm font-medium rounded-lg px-3 py-1.5 transition-colors border'
+  const claseBoton = (activo: boolean) =>
+    activo
+      ? `${BOTON_BASE} bg-primary text-white border-primary`
+      : `${BOTON_BASE} bg-white text-text-muted border-border hover:bg-surface`
 
   useEffect(() => {
     if (!clienteBusqueda.trim()) {
@@ -178,7 +231,8 @@ export default function Turnos() {
     setProfesionalId('')
     setFechaTurno(fecha)
     setHoraTurno('')
-    setServicios('')
+    setServiciosEstilista('')
+    setServiciosManicura('')
     setObservaciones('')
     setErrorModal('')
     setModalAbierto(true)
@@ -186,7 +240,7 @@ export default function Turnos() {
 
   const handleCrearTurno = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!clienteSeleccionado || !profesionalId || !fechaTurno || !horaTurno || !servicios) return
+    if (!clienteSeleccionado || !profesionalId || !fechaTurno || !horaTurno || !serviciosEstilista) return
 
     setErrorModal('')
     setCreando(true)
@@ -197,7 +251,8 @@ export default function Turnos() {
         profesionalId: Number(profesionalId),
         fecha: fechaTurno,
         hora: horaTurno,
-        servicios,
+        serviciosEstilista,
+        serviciosManicura: serviciosManicura || undefined,
         observaciones: observaciones || undefined,
       })
 
@@ -275,17 +330,22 @@ export default function Turnos() {
     clienteBusqueda.trim() !== '' && !buscandoCliente && clienteResultados.length === 0 && !clienteSeleccionado
 
   const puedeCrear = useMemo(
-    () => !!(clienteSeleccionado && profesionalId && fechaTurno && horaTurno && servicios),
-    [clienteSeleccionado, profesionalId, fechaTurno, horaTurno, servicios]
+    () => !!(clienteSeleccionado && profesionalId && fechaTurno && horaTurno && serviciosEstilista),
+    [clienteSeleccionado, profesionalId, fechaTurno, horaTurno, serviciosEstilista]
   )
 
   return (
     <Layout titulo="Turnos">
-      <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
-        <div className="flex flex-wrap items-end gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4 mb-4">
+        <div
+          className={`flex flex-wrap items-end gap-4 transition-opacity ${
+            modoFiltro === 'fecha' || modoFiltro === 'profesionalFecha' ? '' : 'opacity-50'
+          }`}
+        >
           <div className="flex flex-col">
             <label className="text-sm font-medium text-text mb-2">Fecha</label>
             <input
+              ref={fechaInputRef}
               type="date"
               value={fecha}
               onChange={(e) => setFecha(e.target.value)}
@@ -310,12 +370,66 @@ export default function Turnos() {
           </div>
         </div>
 
-        <button
-          onClick={abrirModal}
-          className="bg-primary hover:bg-primary-dark text-white font-medium rounded-lg px-4 py-2 transition-colors"
-        >
-          + Nuevo Turno
+        <div className="flex gap-3">
+          <button
+            onClick={() => navigate('/ausencias')}
+            className="border border-border text-text font-medium rounded-lg px-4 py-2 transition-colors hover:bg-surface"
+          >
+            Gestionar Ausencias
+          </button>
+          <button
+            onClick={() => navigate('/turnos/archivados')}
+            className="border border-border text-text font-medium rounded-lg px-4 py-2 transition-colors hover:bg-surface"
+          >
+            Ver Archivados
+          </button>
+          <button
+            onClick={abrirModal}
+            className="bg-primary hover:bg-primary-dark text-white font-medium rounded-lg px-4 py-2 transition-colors"
+          >
+            + Nuevo Turno
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-6">
+        <button onClick={() => activarModo('cliente')} className={claseBoton(modoFiltro === 'cliente')}>
+          Por Cliente
         </button>
+        <button onClick={() => activarModo('telefono')} className={claseBoton(modoFiltro === 'telefono')}>
+          Por Teléfono
+        </button>
+        <button onClick={() => activarModo('fecha')} className={claseBoton(modoFiltro === 'fecha')}>
+          Por Fecha
+        </button>
+        <button
+          onClick={() => activarModo('profesionalFecha')}
+          className={claseBoton(modoFiltro === 'profesionalFecha')}
+        >
+          Profesional + Fecha
+        </button>
+        <button onClick={mostrarTodos} className={claseBoton(modoFiltro === 'todos')}>
+          Mostrar Todos
+        </button>
+
+        {modoFiltro === 'cliente' && (
+          <input
+            autoFocus
+            value={clienteFiltroRapido}
+            onChange={(e) => setClienteFiltroRapido(e.target.value)}
+            placeholder="Nombre del cliente..."
+            className="border border-border rounded-lg px-3 py-1.5 text-sm outline-none focus:border-primary transition-colors ml-2"
+          />
+        )}
+        {modoFiltro === 'telefono' && (
+          <input
+            autoFocus
+            value={telefonoFiltroRapido}
+            onChange={(e) => setTelefonoFiltroRapido(e.target.value)}
+            placeholder="Teléfono..."
+            className="border border-border rounded-lg px-3 py-1.5 text-sm outline-none focus:border-primary transition-colors ml-2"
+          />
+        )}
       </div>
 
       {advertencia && (
@@ -528,12 +642,24 @@ export default function Turnos() {
               </div>
 
               <div className="flex flex-col mt-4">
-                <label className="text-sm font-medium text-text mb-2">Servicios</label>
+                <label className="text-sm font-medium text-text mb-2">Servicios Estilista</label>
                 <input
-                  value={servicios}
-                  onChange={(e) => setServicios(e.target.value)}
+                  value={serviciosEstilista}
+                  onChange={(e) => setServiciosEstilista(e.target.value)}
                   placeholder="Ej: Corte + Color"
                   required
+                  className="border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              <div className="flex flex-col mt-4">
+                <label className="text-sm font-medium text-text mb-2">
+                  Servicios Manicura <span className="text-text-muted font-normal">(opcional)</span>
+                </label>
+                <input
+                  value={serviciosManicura}
+                  onChange={(e) => setServiciosManicura(e.target.value)}
+                  placeholder="Ej: Esmaltado semipermanente"
                   className="border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors"
                 />
               </div>

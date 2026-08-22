@@ -36,15 +36,20 @@ export const listarClientes = async (req: AuthRequest, res: Response) => {
             orderBy: { fecha: 'desc' },
             take: 1,
             select: { fecha: true }
+          },
+          fichaTrabajos: {
+            orderBy: [{ fecha: 'desc' }, { creadoEn: 'desc' }],
+            take: 1
           }
         }
       }),
       paginado ? prisma.cliente.count({ where }) : Promise.resolve(undefined)
     ])
 
-    const resultado = clientes.map(({ ordenes, ...resto }) => ({
+    const resultado = clientes.map(({ ordenes, fichaTrabajos, ...resto }) => ({
       ...resto,
-      ultimaVisita: ordenes[0]?.fecha ?? null
+      ultimaVisita: ordenes[0]?.fecha ?? null,
+      ultimoTrabajo: fichaTrabajos[0] ?? null
     }))
 
     if (paginado) {
@@ -80,10 +85,28 @@ export const buscarAvanzado = async (req: AuthRequest, res: Response) => {
         }))
       },
       orderBy: { apellido: 'asc' },
-      take: 20
+      take: 20,
+      include: {
+        ordenes: {
+          where: { estado: 'COBRADA' },
+          orderBy: { fecha: 'desc' },
+          take: 1,
+          select: { fecha: true }
+        },
+        fichaTrabajos: {
+          orderBy: [{ fecha: 'desc' }, { creadoEn: 'desc' }],
+          take: 1
+        }
+      }
     })
 
-    res.json(clientes)
+    const resultado = clientes.map(({ ordenes, fichaTrabajos, ...resto }) => ({
+      ...resto,
+      ultimaVisita: ordenes[0]?.fecha ?? null,
+      ultimoTrabajo: fichaTrabajos[0] ?? null
+    }))
+
+    res.json(resultado)
   } catch {
     res.status(500).json({ error: 'Error al buscar clientes' })
   }
@@ -103,6 +126,9 @@ export const obtenerFicha = async (req: AuthRequest, res: Response) => {
             profesional: true,
             items: { include: { servicio: true } }
           }
+        },
+        fichaTrabajos: {
+          orderBy: [{ fecha: 'desc' }, { creadoEn: 'desc' }]
         }
       }
     })

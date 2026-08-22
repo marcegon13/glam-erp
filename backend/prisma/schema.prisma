@@ -24,6 +24,7 @@ model Tenant {
   liquidaciones Liquidacion[]
   turnos        Turno[]
   ausencias     Ausencia[]
+  fichaTrabajos FichaTrabajo[]
 
   @@map("tenants")
 }
@@ -99,11 +100,28 @@ model Cliente {
   activo     Boolean  @default(true)
   creadoEn   DateTime @default(now())
 
-  tenant  Tenant  @relation(fields: [tenantId], references: [id])
-  ordenes Orden[]
-  turnos  Turno[]
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  ordenes       Orden[]
+  turnos        Turno[]
+  fichaTrabajos FichaTrabajo[]
 
   @@map("clientes")
+}
+
+// ─── FICHA DE TRABAJOS ─────────────────────────────────────────────────────
+model FichaTrabajo {
+  id               Int      @id @default(autoincrement())
+  tenantId         Int
+  clienteId        Int
+  trabajoRealizado String
+  estilista        String
+  fecha            DateTime @db.Date
+  creadoEn         DateTime @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  cliente Cliente @relation(fields: [clienteId], references: [id])
+
+  @@map("ficha_trabajos")
 }
 
 // ─── SERVICIOS ─────────────────────────────────────────────────────────────

@@ -5,7 +5,7 @@ import { AuthRequest } from '../middleware/auth.js'
 const ESTADOS_ACTIVOS = ['PENDIENTE', 'CONFIRMADO'] as const
 
 export const listarTurnos = async (req: AuthRequest, res: Response) => {
-  const { fecha, profesionalId } = req.query
+  const { fecha, profesionalId, cliente, telefono } = req.query
 
   try {
     const filtroFecha = fecha ? new Date(`${fecha}T00:00:00.000Z`) : undefined
@@ -15,7 +15,24 @@ export const listarTurnos = async (req: AuthRequest, res: Response) => {
         tenantId: req.tenantId,
         estado: { in: [...ESTADOS_ACTIVOS] },
         ...(filtroFecha ? { fecha: filtroFecha } : {}),
-        ...(profesionalId ? { profesionalId: Number(profesionalId) } : {})
+        ...(profesionalId ? { profesionalId: Number(profesionalId) } : {}),
+        ...(cliente || telefono
+          ? {
+              cliente: {
+                OR: [
+                  ...(cliente
+                    ? [
+                        { nombre: { contains: cliente as string, mode: 'insensitive' as const } },
+                        { apellido: { contains: cliente as string, mode: 'insensitive' as const } }
+                      ]
+                    : []),
+                  ...(telefono
+                    ? [{ telefono: { contains: telefono as string, mode: 'insensitive' as const } }]
+                    : [])
+                ]
+              }
+            }
+          : {})
       },
       orderBy: [{ fecha: 'asc' }, { hora: 'asc' }],
       include: {
@@ -30,13 +47,47 @@ export const listarTurnos = async (req: AuthRequest, res: Response) => {
   }
 }
 
-export const crearTurno = async (req: AuthRequest, res: Response) => {
-  const { clienteId, profesionalId, fecha, hora, servicios, observaciones } = req.body
+export const listarArchivados = async (req: AuthRequest, res: Response) => {
+  const { fecha, profesionalId } = req.query
 
-  if (!clienteId || !profesionalId || !fecha || !hora || !servicios) {
-    res.status(400).json({ error: 'Cliente, profesional, fecha, hora y servicios son requeridos' })
+  try {
+    const filtroFecha = fecha ? new Date(`${fecha}T00:00:00.000Z`) : undefined
+
+    const turnos = await prisma.turno.findMany({
+      where: {
+        tenantId: req.tenantId,
+        estado: 'ARCHIVADO',
+        ...(filtroFecha ? { fecha: filtroFecha } : {}),
+        ...(profesionalId ? { profesionalId: Number(profesionalId) } : {})
+      },
+      orderBy: [{ fecha: 'desc' }, { hora: 'asc' }],
+      include: {
+        cliente: true,
+        profesional: true
+      }
+    })
+
+    res.json(turnos)
+  } catch {
+    res.status(500).json({ error: 'Error al listar turnos archivados' })
+  }
+}
+
+function armarServicios(serviciosEstilista?: string, serviciosManicura?: string): string {
+  return serviciosManicura
+    ? `Estilista: ${serviciosEstilista} | Manicura: ${serviciosManicura}`
+    : `Estilista: ${serviciosEstilista}`
+}
+
+export const crearTurno = async (req: AuthRequest, res: Response) => {
+  const { clienteId, profesionalId, fecha, hora, serviciosEstilista, serviciosManicura, observaciones } = req.body
+
+  if (!clienteId || !profesionalId || !fecha || !hora || !serviciosEstilista) {
+    res.status(400).json({ error: 'Cliente, profesional, fecha, hora y servicios de estilista son requeridos' })
     return
   }
+
+  const servicios = armarServicios(serviciosEstilista, serviciosManicura)
 
   try {
     const fechaTurno = new Date(`${fecha}T00:00:00.000Z`)
@@ -128,7 +179,7 @@ export const obtenerTurno = async (req: AuthRequest, res: Response) => {
 
 export const editarTurno = async (req: AuthRequest, res: Response) => {
   const id = Number(req.params.id)
-  const { clienteId, profesionalId, fecha, hora, servicios, observaciones } = req.body
+  const { clienteId, profesionalId, fecha, hora, serviciosEstilista, serviciosManicura, observaciones } = req.body
 
   try {
     const turnoExistente = await prisma.turno.findFirst({
@@ -144,7 +195,9 @@ export const editarTurno = async (req: AuthRequest, res: Response) => {
     const profesionalFinal = profesionalId ?? turnoExistente.profesionalId
     const fechaFinal = fecha ? new Date(`${fecha}T00:00:00.000Z`) : turnoExistente.fecha
     const horaFinal = hora ?? turnoExistente.hora
-    const serviciosFinal = servicios ?? turnoExistente.servicios
+    const serviciosFinal = serviciosEstilista
+      ? armarServicios(serviciosEstilista, serviciosManicura)
+      : turnoExistente.servicios
     const observacionesFinal = observaciones !== undefined ? observaciones : turnoExistente.observaciones
 
     const ausencia = await prisma.ausencia.findFirst({
