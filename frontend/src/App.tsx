@@ -2,7 +2,10 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Recepcion from './pages/Recepcion'
+import Turnos from './pages/Turnos'
 import OrdenDetalle from './pages/OrdenDetalle'
+import Profesionales from './pages/Profesionales'
+import Servicios from './pages/Servicios'
 import { authStore } from './store/auth'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -35,10 +38,34 @@ export default function App() {
           }
         />
         <Route
+          path="/turnos"
+          element={
+            <RequireAuth>
+              <Turnos />
+            </RequireAuth>
+          }
+        />
+        <Route
           path="/ordenes/:id"
           element={
             <RequireAuth>
               <OrdenDetalle />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/profesionales"
+          element={
+            <RequireAuth>
+              <Profesionales />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/servicios"
+          element={
+            <RequireAuth>
+              <Servicios />
             </RequireAuth>
           }
         />

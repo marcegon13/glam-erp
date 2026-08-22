@@ -4,6 +4,7 @@ import { authStore } from '../store/auth'
 const MENU = [
   { key: 'inicio', label: 'Inicio', icon: '🏠', path: '/dashboard' },
   { key: 'recepcion', label: 'Recepción', icon: '🗓️', path: '/recepcion' },
+  { key: 'turnos', label: 'Turnos', icon: '📅', path: '/turnos' },
   { key: 'clientes', label: 'Clientes', icon: '👥', path: '/clientes' },
   { key: 'profesionales', label: 'Profesionales', icon: '💇', path: '/profesionales' },
   { key: 'servicios', label: 'Servicios', icon: '✨', path: '/servicios' },

@@ -70,10 +70,12 @@ export default function OrdenDetalle() {
 
   useEffect(() => {
     if (!orden) return
-    const tipo = orden.profesional.tipo === 'MANICURA' ? 'MANICURA' : 'ESTILISTA'
-    api
-      .get('/servicios', { params: { tipo } })
-      .then(({ data }) => setServicios(data))
+    const tipo = orden.profesional.tipo === 'MANICURA' ? 'MANICURIA' : 'PELUQUERIA'
+    Promise.all([
+      api.get('/servicios', { params: { tipo } }),
+      api.get('/servicios', { params: { tipo: 'PRODUCTO' } }),
+    ])
+      .then(([porTipo, productos]) => setServicios([...porTipo.data, ...productos.data]))
       .catch(() => setServicios([]))
   }, [orden?.profesional.tipo])
 

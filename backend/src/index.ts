@@ -1,12 +1,15 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
+import { prisma } from './lib/prisma.js'
 import authRoutes from './routes/auth.routes.js'
 import clientesRoutes from './routes/clientes.routes.js'
 import profesionalesRoutes from './routes/profesionales.routes.js'
 import serviciosRoutes from './routes/servicios.routes.js'
 import ordenesRoutes from './routes/ordenes.routes.js'
 import liquidacionesRoutes from './routes/liquidaciones.routes.js'
+import turnosRoutes from './routes/turnos.routes.js'
+import ausenciasRoutes from './routes/ausencias.routes.js'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -24,9 +27,32 @@ app.use('/api/profesionales', profesionalesRoutes)
 app.use('/api/servicios', serviciosRoutes)
 app.use('/api/ordenes', ordenesRoutes)
 app.use('/api/liquidaciones', liquidacionesRoutes)
+app.use('/api/turnos', turnosRoutes)
+app.use('/api/ausencias', ausenciasRoutes)
 
-app.listen(PORT, () => {
-  console.log(`Glam ERP backend corriendo en puerto ${PORT}`)
+const archivarTurnosAlIniciar = async () => {
+  try {
+    const fechaLimite = new Date()
+    fechaLimite.setUTCDate(fechaLimite.getUTCDate() - 30)
+
+    const resultado = await prisma.turno.updateMany({
+      where: {
+        fecha: { lt: fechaLimite },
+        estado: { in: ['PENDIENTE', 'CONFIRMADO'] }
+      },
+      data: { estado: 'ARCHIVADO' }
+    })
+
+    console.log(`Turnos archivados al iniciar: ${resultado.count}`)
+  } catch (error) {
+    console.error('No se pudieron archivar turnos viejos al iniciar', error)
+  }
+}
+
+archivarTurnosAlIniciar().finally(() => {
+  app.listen(PORT, () => {
+    console.log(`Glam ERP backend corriendo en puerto ${PORT}`)
+  })
 })
 
 export default app

@@ -22,6 +22,8 @@ model Tenant {
   ordenes       Orden[]
   caja          Caja[]
   liquidaciones Liquidacion[]
+  turnos        Turno[]
+  ausencias     Ausencia[]
 
   @@map("tenants")
 }
@@ -43,8 +45,9 @@ model Usuario {
   activo     Boolean  @default(true)
   creadoEn   DateTime @default(now())
 
-  tenant  Tenant  @relation(fields: [tenantId], references: [id])
-  ordenes Orden[]
+  tenant        Tenant  @relation(fields: [tenantId], references: [id])
+  ordenes       Orden[]
+  turnosCreados Turno[]
 
   @@unique([tenantId, email])
   @@map("usuarios")
@@ -73,6 +76,8 @@ model Profesional {
   tenant        Tenant        @relation(fields: [tenantId], references: [id])
   ordenes       Orden[]
   liquidaciones Liquidacion[]
+  turnos        Turno[]
+  ausencias     Ausencia[]
 
   @@map("profesionales")
 }
@@ -96,6 +101,7 @@ model Cliente {
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id])
   ordenes Orden[]
+  turnos  Turno[]
 
   @@map("clientes")
 }
@@ -116,9 +122,9 @@ model Servicio {
 }
 
 enum TipoServicio {
-  ESTILISTA
-  MANICURA
-  GENERAL
+  PELUQUERIA
+  MANICURIA
+  PRODUCTO
 }
 
 // ─── ORDENES ───────────────────────────────────────────────────────────────
@@ -222,4 +228,49 @@ model Liquidacion {
 
   @@unique([profesionalId, periodo])
   @@map("liquidaciones")
+}
+
+// ─── TURNOS ────────────────────────────────────────────────────────────────
+model Turno {
+  id            Int          @id @default(autoincrement())
+  tenantId      Int
+  clienteId     Int
+  profesionalId Int
+  fecha         DateTime     @db.Date
+  hora          String
+  servicios     String
+  observaciones String?
+  estado        EstadoTurno  @default(PENDIENTE)
+  creadoPor     Int
+  creadoEn      DateTime     @default(now())
+  actualizadoEn DateTime     @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  cliente     Cliente     @relation(fields: [clienteId], references: [id])
+  profesional Profesional @relation(fields: [profesionalId], references: [id])
+  usuario     Usuario     @relation(fields: [creadoPor], references: [id])
+
+  @@map("turnos")
+}
+
+enum EstadoTurno {
+  PENDIENTE
+  CONFIRMADO
+  CANCELADO
+  ARCHIVADO
+}
+
+model Ausencia {
+  id            Int         @id @default(autoincrement())
+  tenantId      Int
+  profesionalId Int
+  fecha         DateTime    @db.Date
+  motivo        String?
+  creadoEn      DateTime    @default(now())
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  profesional Profesional @relation(fields: [profesionalId], references: [id])
+
+  @@unique([profesionalId, fecha])
+  @@map("ausencias")
 }
