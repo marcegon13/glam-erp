@@ -126,12 +126,13 @@ model FichaTrabajo {
 
 // ─── SERVICIOS ─────────────────────────────────────────────────────────────
 model Servicio {
-  id         Int             @id @default(autoincrement())
-  tenantId   Int
-  nombre     String
-  precio     Decimal         @db.Decimal(10, 2)
-  tipo       TipoServicio
-  activo     Boolean         @default(true)
+  id             Int             @id @default(autoincrement())
+  tenantId       Int
+  nombre         String
+  precioEfectivo Decimal         @db.Decimal(10, 2)
+  precioTarjeta  Decimal         @db.Decimal(10, 2)
+  tipo           TipoServicio
+  activo         Boolean         @default(true)
 
   tenant Tenant       @relation(fields: [tenantId], references: [id])
   items  OrdenItem[]
@@ -178,6 +179,7 @@ model OrdenItem {
   ordenId        Int
   servicioId     Int?
   descripcion    String
+  cantidad       Int     @default(1)
   precioAplicado Decimal @db.Decimal(10, 2)
 
   orden    Orden     @relation(fields: [ordenId], references: [id])
@@ -192,6 +194,7 @@ model Pago {
   ordenId     Int
   metodo      MetodoPago
   monto       Decimal      @db.Decimal(10, 2)
+  acreditado  Boolean      @default(true)
   fecha       DateTime     @default(now())
 
   orden Orden @relation(fields: [ordenId], references: [id])
@@ -203,6 +206,7 @@ enum MetodoPago {
   EFECTIVO
   TARJETA
   TRANSFERENCIA
+  MERCADO_PAGO
 }
 
 // ─── CAJA ──────────────────────────────────────────────────────────────────

@@ -3,14 +3,15 @@ import { prisma } from '../lib/prisma.js'
 import { AuthRequest } from '../middleware/auth.js'
 
 export const listarServicios = async (req: AuthRequest, res: Response) => {
-  const { tipo } = req.query
+  const { tipo, busqueda } = req.query
 
   try {
     const servicios = await prisma.servicio.findMany({
       where: {
         tenantId: req.tenantId,
         activo: true,
-        ...(tipo ? { tipo: tipo as any } : {})
+        ...(tipo ? { tipo: tipo as any } : {}),
+        ...(busqueda ? { nombre: { contains: busqueda as string, mode: 'insensitive' as const } } : {})
       },
       orderBy: { nombre: 'asc' }
     })
@@ -22,10 +23,10 @@ export const listarServicios = async (req: AuthRequest, res: Response) => {
 }
 
 export const crearServicio = async (req: AuthRequest, res: Response) => {
-  const { nombre, precio, tipo } = req.body
+  const { nombre, precioEfectivo, precioTarjeta, tipo } = req.body
 
-  if (!nombre || !precio || !tipo) {
-    res.status(400).json({ error: 'Nombre, precio y tipo son requeridos' })
+  if (!nombre || !precioEfectivo || !precioTarjeta || !tipo) {
+    res.status(400).json({ error: 'Nombre, precio efectivo, precio tarjeta y tipo son requeridos' })
     return
   }
 
@@ -34,7 +35,8 @@ export const crearServicio = async (req: AuthRequest, res: Response) => {
       data: {
         tenantId: req.tenantId!,
         nombre,
-        precio,
+        precioEfectivo,
+        precioTarjeta,
         tipo
       }
     })
@@ -47,12 +49,12 @@ export const crearServicio = async (req: AuthRequest, res: Response) => {
 
 export const editarServicio = async (req: AuthRequest, res: Response) => {
   const id = Number(req.params.id)
-  const { nombre, precio, tipo } = req.body
+  const { nombre, precioEfectivo, precioTarjeta, tipo } = req.body
 
   try {
     const resultado = await prisma.servicio.updateMany({
       where: { id, tenantId: req.tenantId },
-      data: { nombre, precio, tipo }
+      data: { nombre, precioEfectivo, precioTarjeta, tipo }
     })
 
     if (resultado.count === 0) {

@@ -5,7 +5,8 @@ import api from '../api/axios'
 interface Servicio {
   id: number
   nombre: string
-  precio: string
+  precioEfectivo: string
+  precioTarjeta: string
   tipo: 'PELUQUERIA' | 'MANICURIA' | 'PRODUCTO'
   activo: boolean
 }
@@ -33,7 +34,8 @@ export default function Servicios() {
   const [editando, setEditando] = useState<Servicio | null>(null)
   const [nombre, setNombre] = useState('')
   const [tipo, setTipo] = useState<Servicio['tipo']>('PELUQUERIA')
-  const [precio, setPrecio] = useState('')
+  const [precioEfectivo, setPrecioEfectivo] = useState('')
+  const [precioTarjeta, setPrecioTarjeta] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [errorModal, setErrorModal] = useState('')
 
@@ -57,7 +59,8 @@ export default function Servicios() {
     setEditando(null)
     setNombre('')
     setTipo('PELUQUERIA')
-    setPrecio('')
+    setPrecioEfectivo('')
+    setPrecioTarjeta('')
     setErrorModal('')
     setModalAbierto(true)
   }
@@ -66,7 +69,8 @@ export default function Servicios() {
     setEditando(s)
     setNombre(s.nombre)
     setTipo(s.tipo)
-    setPrecio(s.precio)
+    setPrecioEfectivo(s.precioEfectivo)
+    setPrecioTarjeta(s.precioTarjeta)
     setErrorModal('')
     setModalAbierto(true)
   }
@@ -76,7 +80,12 @@ export default function Servicios() {
     setErrorModal('')
     setGuardando(true)
 
-    const body = { nombre, tipo, precio: Number(precio) }
+    const body = {
+      nombre,
+      tipo,
+      precioEfectivo: Number(precioEfectivo),
+      precioTarjeta: Number(precioTarjeta),
+    }
 
     try {
       if (editando) {
@@ -128,7 +137,8 @@ export default function Servicios() {
             <tr className="text-left text-text-muted border-b border-border">
               <th className="px-5 py-3 font-medium">Servicio</th>
               <th className="px-5 py-3 font-medium">Tipo</th>
-              <th className="px-5 py-3 font-medium">Precio</th>
+              <th className="px-5 py-3 font-medium">Precio Efectivo</th>
+              <th className="px-5 py-3 font-medium">Precio Tarjeta</th>
               <th className="px-5 py-3 font-medium">Estado</th>
               <th className="px-5 py-3 font-medium text-right">Acciones</th>
             </tr>
@@ -136,13 +146,13 @@ export default function Servicios() {
           <tbody>
             {cargando ? (
               <tr>
-                <td colSpan={5} className="px-5 py-6 text-center text-text-muted">
+                <td colSpan={6} className="px-5 py-6 text-center text-text-muted">
                   Cargando...
                 </td>
               </tr>
             ) : servicios.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-5 py-6 text-center text-text-muted">
+                <td colSpan={6} className="px-5 py-6 text-center text-text-muted">
                   No hay servicios cargados
                 </td>
               </tr>
@@ -158,7 +168,8 @@ export default function Servicios() {
                       {TIPO_LABEL[s.tipo]}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-text">{formatoMoneda(s.precio)}</td>
+                  <td className="px-5 py-3 text-text">{formatoMoneda(s.precioEfectivo)}</td>
+                  <td className="px-5 py-3 text-text">{formatoMoneda(s.precioTarjeta)}</td>
                   <td className="px-5 py-3">
                     <span
                       className={`text-xs font-medium px-2 py-1 rounded-full ${
@@ -221,11 +232,22 @@ export default function Servicios() {
               </div>
 
               <div className="flex flex-col mt-4">
-                <label className="text-sm font-medium text-text mb-2">Precio</label>
+                <label className="text-sm font-medium text-text mb-2">Precio Efectivo $</label>
                 <input
                   type="number"
-                  value={precio}
-                  onChange={(e) => setPrecio(e.target.value)}
+                  value={precioEfectivo}
+                  onChange={(e) => setPrecioEfectivo(e.target.value)}
+                  required
+                  className="border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              <div className="flex flex-col mt-4">
+                <label className="text-sm font-medium text-text mb-2">Precio Tarjeta $</label>
+                <input
+                  type="number"
+                  value={precioTarjeta}
+                  onChange={(e) => setPrecioTarjeta(e.target.value)}
                   required
                   className="border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors"
                 />

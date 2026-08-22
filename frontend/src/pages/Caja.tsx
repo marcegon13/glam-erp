@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import Layout from '../components/Layout'
 import api from '../api/axios'
 
-type Metodo = 'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA'
+type Metodo = 'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA' | 'MERCADO_PAGO'
 type Tipo = 'INGRESO' | 'EGRESO'
 
 interface Movimiento {
@@ -12,24 +12,29 @@ interface Movimiento {
   monto: string
   concepto: string
   fecha: string
+  acreditado: boolean
 }
 
 interface Totales {
   ingresos: number
   egresos: number
   balance: number
+  totalAcreditado: number
+  totalPendiente: number
 }
 
 const METODO_BADGE: Record<Metodo, string> = {
   EFECTIVO: 'bg-green-50 text-green-700',
   TARJETA: 'bg-blue-50 text-blue-700',
   TRANSFERENCIA: 'bg-[#EDE9FE] text-primary',
+  MERCADO_PAGO: 'bg-sky-50 text-sky-700',
 }
 
 const METODO_LABEL: Record<Metodo, string> = {
   EFECTIVO: 'Efectivo',
   TARJETA: 'Tarjeta',
   TRANSFERENCIA: 'Transferencia',
+  MERCADO_PAGO: 'Mercado Pago',
 }
 
 const TIPO_BADGE: Record<Tipo, string> = {
@@ -59,7 +64,13 @@ export default function Caja() {
   const [tipoFiltro, setTipoFiltro] = useState('')
 
   const [movimientos, setMovimientos] = useState<Movimiento[]>([])
-  const [totales, setTotales] = useState<Totales>({ ingresos: 0, egresos: 0, balance: 0 })
+  const [totales, setTotales] = useState<Totales>({
+    ingresos: 0,
+    egresos: 0,
+    balance: 0,
+    totalAcreditado: 0,
+    totalPendiente: 0,
+  })
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
 
@@ -157,10 +168,14 @@ export default function Caja() {
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-2xl shadow-sm border border-border p-5">
-          <p className="text-sm text-text-muted">Total Ingresos</p>
-          <p className="text-2xl font-bold text-green-700 mt-2">{formatoMoneda(totales.ingresos)}</p>
+          <p className="text-sm text-text-muted">✅ Acreditado</p>
+          <p className="text-2xl font-bold text-green-700 mt-2">{formatoMoneda(totales.totalAcreditado)}</p>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-border p-5">
+          <p className="text-sm text-text-muted">⏳ Pendiente</p>
+          <p className="text-2xl font-bold text-amber-600 mt-2">{formatoMoneda(totales.totalPendiente)}</p>
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-border p-5">
           <p className="text-sm text-text-muted">Total Egresos</p>
@@ -210,6 +225,7 @@ export default function Caja() {
                   <td className="px-5 py-3 text-text font-medium">{m.concepto}</td>
                   <td className="px-5 py-3">
                     <span className={`text-xs font-medium px-2 py-1 rounded-full ${METODO_BADGE[m.metodo]}`}>
+                      {!m.acreditado && '⏳ '}
                       {METODO_LABEL[m.metodo]}
                     </span>
                   </td>
@@ -261,6 +277,7 @@ export default function Caja() {
                   <option value="EFECTIVO">Efectivo</option>
                   <option value="TARJETA">Tarjeta</option>
                   <option value="TRANSFERENCIA">Transferencia</option>
+                  <option value="MERCADO_PAGO">Mercado Pago</option>
                 </select>
               </div>
 

@@ -33,7 +33,7 @@ export const crearOrden = async (req: AuthRequest, res: Response) => {
 
 export const agregarItem = async (req: AuthRequest, res: Response) => {
   const ordenId = Number(req.params.id)
-  const { servicioId, descripcion, precioAplicado } = req.body
+  const { servicioId, descripcion, precioAplicado, cantidad } = req.body
 
   if (!descripcion || precioAplicado == null) {
     res.status(400).json({ error: 'Descripción y precio aplicado son requeridos' })
@@ -60,13 +60,53 @@ export const agregarItem = async (req: AuthRequest, res: Response) => {
         ordenId,
         servicioId,
         descripcion,
-        precioAplicado
+        precioAplicado,
+        cantidad: cantidad ?? 1
       }
     })
 
     res.status(201).json(item)
   } catch {
     res.status(500).json({ error: 'Error al agregar item' })
+  }
+}
+
+export const editarItem = async (req: AuthRequest, res: Response) => {
+  const ordenId = Number(req.params.id)
+  const itemId = Number(req.params.itemId)
+  const { cantidad, precioAplicado } = req.body
+
+  try {
+    const orden = await prisma.orden.findFirst({
+      where: { id: ordenId, tenantId: req.tenantId }
+    })
+
+    if (!orden) {
+      res.status(404).json({ error: 'Orden no encontrada' })
+      return
+    }
+
+    if (orden.estado !== 'ABIERTA') {
+      res.status(400).json({ error: 'La orden no está abierta' })
+      return
+    }
+
+    const resultado = await prisma.ordenItem.updateMany({
+      where: { id: itemId, ordenId },
+      data: {
+        ...(cantidad != null ? { cantidad } : {}),
+        ...(precioAplicado != null ? { precioAplicado } : {})
+      }
+    })
+
+    if (resultado.count === 0) {
+      res.status(404).json({ error: 'Item no encontrado' })
+      return
+    }
+
+    res.json({ message: 'Item actualizado' })
+  } catch {
+    res.status(500).json({ error: 'Error al editar item' })
   }
 }
 
@@ -174,7 +214,7 @@ export const cobrarOrden = async (req: AuthRequest, res: Response) => {
     const ordenActualizada = await prisma.$transaction(async (tx) => {
       const orden = await tx.orden.findFirst({
         where: { id, tenantId: req.tenantId },
-        include: { items: true }
+        include: { items: { include: { servicio: true } } }
       })
 
       if (!orden) {
@@ -185,16 +225,33 @@ export const cobrarOrden = async (req: AuthRequest, res: Response) => {
         throw new Error('ORDEN_NO_ABIERTA')
       }
 
-      const total = orden.items.reduce(
-        (suma, item) => suma + Number(item.precioAplicado),
-        0
-      )
+      let total = 0
+      for (const item of orden.items) {
+        let precioUnitario = Number(item.precioAplicado)
+
+        if (item.servicio) {
+          precioUnitario =
+            metodo === 'EFECTIVO'
+              ? Number(item.servicio.precioEfectivo)
+              : Number(item.servicio.precioTarjeta)
+
+          if (precioUnitario !== Number(item.precioAplicado)) {
+            await tx.ordenItem.update({
+              where: { id: item.id },
+              data: { precioAplicado: precioUnitario }
+            })
+          }
+        }
+
+        total += precioUnitario * item.cantidad
+      }
 
       await tx.pago.create({
         data: {
           ordenId: id,
           metodo,
-          monto: total
+          monto: total,
+          acreditado: metodo === 'EFECTIVO'
         }
       })
 
@@ -236,6 +293,48 @@ export const cobrarOrden = async (req: AuthRequest, res: Response) => {
       return
     }
     res.status(500).json({ error: 'Error al cobrar orden' })
+  }
+}
+
+export const acreditarOrden = async (req: AuthRequest, res: Response) => {
+  const id = Number(req.params.id)
+
+  try {
+    const orden = await prisma.orden.findFirst({
+      where: { id, tenantId: req.tenantId },
+      include: { pagos: true }
+    })
+
+    if (!orden) {
+      res.status(404).json({ error: 'Orden no encontrada' })
+      return
+    }
+
+    const pago = orden.pagos[0]
+
+    if (!pago) {
+      res.status(400).json({ error: 'La orden no tiene un pago registrado' })
+      return
+    }
+
+    await prisma.pago.update({
+      where: { id: pago.id },
+      data: { acreditado: true }
+    })
+
+    const ordenActualizada = await prisma.orden.findFirst({
+      where: { id },
+      include: {
+        cliente: true,
+        profesional: true,
+        items: { include: { servicio: true } },
+        pagos: true
+      }
+    })
+
+    res.json(ordenActualizada)
+  } catch {
+    res.status(500).json({ error: 'Error al acreditar orden' })
   }
 }
 

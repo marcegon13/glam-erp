@@ -5,7 +5,8 @@ import api from '../api/axios'
 interface Servicio {
   id: number
   nombre: string
-  precio: string
+  precioEfectivo: string
+  precioTarjeta: string
   tipo: string
 }
 
@@ -13,6 +14,7 @@ interface OrdenItem {
   id: number
   descripcion: string
   precioAplicado: string
+  cantidad: number
   servicio: Servicio | null
 }
 
@@ -20,6 +22,7 @@ interface Pago {
   id: number
   metodo: string
   monto: string
+  acreditado: boolean
 }
 
 interface Orden {
@@ -32,11 +35,26 @@ interface Orden {
   pagos: Pago[]
 }
 
-const METODOS = [
-  { key: 'EFECTIVO', label: '💵 Efectivo' },
-  { key: 'TARJETA', label: '💳 Tarjeta' },
-  { key: 'TRANSFERENCIA', label: '📱 Transferencia' },
+type MetodoUI = 'EF' | 'TD' | 'TC' | 'MP'
+
+const METODOS_UI: { key: MetodoUI; label: string; backend: string }[] = [
+  { key: 'EF', label: 'EF', backend: 'EFECTIVO' },
+  { key: 'TD', label: 'TD', backend: 'TARJETA' },
+  { key: 'TC', label: 'TC', backend: 'TARJETA' },
+  { key: 'MP', label: 'MP', backend: 'MERCADO_PAGO' },
 ]
+
+const METODO_LABEL_LARGO: Record<string, string> = {
+  EFECTIVO: 'Efectivo',
+  TARJETA: 'Tarjeta',
+  TRANSFERENCIA: 'Transferencia',
+  MERCADO_PAGO: 'Mercado Pago',
+}
+
+const precioParaMetodo = (servicio: Servicio, metodo: MetodoUI) =>
+  metodo === 'EF' ? Number(servicio.precioEfectivo) : Number(servicio.precioTarjeta)
+
+const formatoMoneda = (valor: number) => `$${valor.toLocaleString('es-AR')}`
 
 export default function OrdenDetalle() {
   const { id } = useParams()
@@ -45,13 +63,19 @@ export default function OrdenDetalle() {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
 
-  const [servicios, setServicios] = useState<Servicio[]>([])
-  const [servicioId, setServicioId] = useState('')
-  const [precio, setPrecio] = useState('')
+  const [metodoUI, setMetodoUI] = useState<MetodoUI>('EF')
+
+  const [busquedaServicio, setBusquedaServicio] = useState('')
+  const [resultadosServicio, setResultadosServicio] = useState<Servicio[]>([])
+  const [buscandoServicio, setBuscandoServicio] = useState(false)
+  const [servicioSeleccionado, setServicioSeleccionado] = useState<Servicio | null>(null)
+  const [cantidad, setCantidad] = useState('1')
+  const [precioUnitario, setPrecioUnitario] = useState('')
   const [agregando, setAgregando] = useState(false)
 
   const [cobrando, setCobrando] = useState(false)
   const [mensajeExito, setMensajeExito] = useState('')
+  const [acreditando, setAcreditando] = useState(false)
 
   const fetchOrden = async () => {
     try {
@@ -70,39 +94,69 @@ export default function OrdenDetalle() {
 
   useEffect(() => {
     if (!orden) return
-    const tipo = orden.profesional.tipo === 'MANICURA' ? 'MANICURIA' : 'PELUQUERIA'
-    Promise.all([
-      api.get('/servicios', { params: { tipo } }),
-      api.get('/servicios', { params: { tipo: 'PRODUCTO' } }),
-    ])
-      .then(([porTipo, productos]) => setServicios([...porTipo.data, ...productos.data]))
-      .catch(() => setServicios([]))
-  }, [orden?.profesional.tipo])
+    if (!busquedaServicio.trim() || servicioSeleccionado) {
+      setResultadosServicio([])
+      return
+    }
 
-  const handleSeleccionarServicio = (id: string) => {
-    setServicioId(id)
-    const servicio = servicios.find((s) => String(s.id) === id)
-    if (servicio) {
-      setPrecio(servicio.precio)
+    const tipo = orden.profesional.tipo === 'MANICURA' ? 'MANICURIA' : 'PELUQUERIA'
+    setBuscandoServicio(true)
+    const timeout = setTimeout(async () => {
+      try {
+        const [porTipo, productos] = await Promise.all([
+          api.get('/servicios', { params: { busqueda: busquedaServicio, tipo } }),
+          api.get('/servicios', { params: { busqueda: busquedaServicio, tipo: 'PRODUCTO' } }),
+        ])
+        setResultadosServicio([...porTipo.data, ...productos.data])
+      } catch {
+        setResultadosServicio([])
+      } finally {
+        setBuscandoServicio(false)
+      }
+    }, 300)
+
+    return () => clearTimeout(timeout)
+  }, [busquedaServicio, orden?.profesional.tipo, servicioSeleccionado])
+
+  // Si cambia el método de pago mientras hay un servicio elegido (todavía no agregado), recalcular su precio
+  useEffect(() => {
+    if (servicioSeleccionado) {
+      setPrecioUnitario(String(precioParaMetodo(servicioSeleccionado, metodoUI)))
+    }
+  }, [metodoUI])
+
+  const handleSeleccionarServicio = (servicio: Servicio) => {
+    setServicioSeleccionado(servicio)
+    setBusquedaServicio(servicio.nombre)
+    setResultadosServicio([])
+    setCantidad('1')
+    setPrecioUnitario(String(precioParaMetodo(servicio, metodoUI)))
+  }
+
+  const handleCambiarBusqueda = (valor: string) => {
+    setBusquedaServicio(valor)
+    if (servicioSeleccionado && valor !== servicioSeleccionado.nombre) {
+      setServicioSeleccionado(null)
+      setPrecioUnitario('')
     }
   }
 
   const handleAgregarItem = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!servicioId || !precio) return
-
-    const servicio = servicios.find((s) => String(s.id) === servicioId)
-    if (!servicio) return
+    if (!servicioSeleccionado || !precioUnitario || !cantidad) return
 
     setAgregando(true)
     try {
       await api.post(`/ordenes/${id}/items`, {
-        servicioId: servicio.id,
-        descripcion: servicio.nombre,
-        precioAplicado: Number(precio),
+        servicioId: servicioSeleccionado.id,
+        descripcion: servicioSeleccionado.nombre,
+        precioAplicado: Number(precioUnitario),
+        cantidad: Number(cantidad),
       })
-      setServicioId('')
-      setPrecio('')
+      setBusquedaServicio('')
+      setServicioSeleccionado(null)
+      setCantidad('1')
+      setPrecioUnitario('')
       await fetchOrden()
     } catch {
       setError('Error al agregar el servicio')
@@ -120,7 +174,28 @@ export default function OrdenDetalle() {
     }
   }
 
-  const handleCobrar = async (metodo: string) => {
+  const handleEditarCantidad = async (item: OrdenItem, nuevaCantidad: number) => {
+    if (!nuevaCantidad || nuevaCantidad === item.cantidad) return
+    try {
+      await api.put(`/ordenes/${id}/items/${item.id}`, { cantidad: nuevaCantidad })
+      await fetchOrden()
+    } catch {
+      setError('Error al actualizar la cantidad')
+    }
+  }
+
+  const handleEditarPrecioUnitario = async (item: OrdenItem, nuevoPrecio: number) => {
+    if (!nuevoPrecio || nuevoPrecio === Number(item.precioAplicado)) return
+    try {
+      await api.put(`/ordenes/${id}/items/${item.id}`, { precioAplicado: nuevoPrecio })
+      await fetchOrden()
+    } catch {
+      setError('Error al actualizar el precio')
+    }
+  }
+
+  const handleCobrar = async () => {
+    const metodo = METODOS_UI.find((m) => m.key === metodoUI)!.backend
     setCobrando(true)
     try {
       const { data } = await api.post(`/ordenes/${id}/cobrar`, { metodo })
@@ -130,6 +205,18 @@ export default function OrdenDetalle() {
       setError('Error al cobrar la orden')
     } finally {
       setCobrando(false)
+    }
+  }
+
+  const handleAcreditar = async () => {
+    setAcreditando(true)
+    try {
+      const { data } = await api.put(`/ordenes/${id}/acreditar`)
+      setOrden(data)
+    } catch {
+      setError('Error al confirmar la acreditación')
+    } finally {
+      setAcreditando(false)
     }
   }
 
@@ -149,7 +236,18 @@ export default function OrdenDetalle() {
     )
   }
 
-  const total = orden.items.reduce((suma, item) => suma + Number(item.precioAplicado), 0)
+  // Precio unitario "en vivo": si el item tiene servicio vinculado, refleja el método de pago
+  // seleccionado actualmente (igual que recalcula el backend al cobrar). Si no, se mantiene fijo.
+  const precioUnitarioMostrado = (item: OrdenItem) =>
+    item.servicio ? precioParaMetodo(item.servicio, metodoUI) : Number(item.precioAplicado)
+
+  const subtotalMostrado = (item: OrdenItem) => precioUnitarioMostrado(item) * item.cantidad
+
+  const total =
+    orden.estado === 'ABIERTA'
+      ? orden.items.reduce((suma, item) => suma + subtotalMostrado(item), 0)
+      : Number(orden.pagos[0]?.monto ?? 0)
+
   const pago = orden.pagos[0]
 
   return (
@@ -170,65 +268,131 @@ export default function OrdenDetalle() {
             {orden.items.length === 0 ? (
               <p className="text-sm text-text-muted">Todavía no hay servicios cargados</p>
             ) : (
-              <div className="flex flex-col gap-2">
-                {orden.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between px-3 py-2 rounded-lg bg-surface"
-                  >
-                    <span className="text-sm text-text">{item.descripcion}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-text">
-                        ${Number(item.precioAplicado).toLocaleString('es-AR')}
-                      </span>
-                      {orden.estado === 'ABIERTA' && (
-                        <button
-                          onClick={() => handleEliminarItem(item.id)}
-                          className="text-text-muted hover:text-red-600 transition-colors"
-                          aria-label="Eliminar item"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-text-muted border-b border-border">
+                      <th className="py-2 font-medium">Servicio</th>
+                      <th className="py-2 font-medium w-16">Nº</th>
+                      <th className="py-2 font-medium w-28">Precio Unitario</th>
+                      <th className="py-2 font-medium w-28">Subtotal</th>
+                      {orden.estado === 'ABIERTA' && <th className="py-2 w-8" />}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orden.items.map((item) => {
+                      const unitario = precioUnitarioMostrado(item)
+                      const subtotal = unitario * item.cantidad
+                      const editable = orden.estado === 'ABIERTA'
+                      return (
+                        <tr key={item.id} className="border-b border-border last:border-0">
+                          <td className="py-2 text-text">{item.descripcion}</td>
+                          <td className="py-2 text-text-muted">
+                            {editable ? (
+                              <input
+                                type="number"
+                                min={1}
+                                defaultValue={item.cantidad}
+                                onBlur={(e) => handleEditarCantidad(item, Number(e.target.value))}
+                                className="w-14 border border-border rounded px-2 py-1 outline-none focus:border-primary transition-colors"
+                              />
+                            ) : (
+                              item.cantidad
+                            )}
+                          </td>
+                          <td className="py-2 text-text-muted">
+                            {editable && !item.servicio ? (
+                              <input
+                                type="number"
+                                defaultValue={item.precioAplicado}
+                                onBlur={(e) => handleEditarPrecioUnitario(item, Number(e.target.value))}
+                                className="w-24 border border-border rounded px-2 py-1 outline-none focus:border-primary transition-colors"
+                              />
+                            ) : (
+                              formatoMoneda(unitario)
+                            )}
+                          </td>
+                          <td className="py-2 font-medium text-text">{formatoMoneda(subtotal)}</td>
+                          {orden.estado === 'ABIERTA' && (
+                            <td className="py-2 text-right">
+                              <button
+                                onClick={() => handleEliminarItem(item.id)}
+                                className="text-text-muted hover:text-red-600 transition-colors"
+                                aria-label="Eliminar item"
+                              >
+                                ✕
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
 
             {orden.estado === 'ABIERTA' && (
               <form onSubmit={handleAgregarItem} className="flex items-end gap-3 mt-6 pt-6 border-t border-border">
-                <div className="flex flex-col flex-1">
+                <div className="flex flex-col flex-1 relative">
                   <label className="text-sm font-medium text-text mb-2">Servicio</label>
-                  <select
-                    value={servicioId}
-                    onChange={(e) => handleSeleccionarServicio(e.target.value)}
-                    className="border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors bg-white"
-                  >
-                    <option value="" disabled>
-                      Seleccioná un servicio
-                    </option>
-                    {servicios.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.nombre}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    value={busquedaServicio}
+                    onChange={(e) => handleCambiarBusqueda(e.target.value)}
+                    placeholder="Buscar servicio..."
+                    autoComplete="off"
+                    className="border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors"
+                  />
+                  {busquedaServicio.trim() && !servicioSeleccionado && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-border rounded-lg shadow-sm z-10 max-h-48 overflow-y-auto">
+                      {buscandoServicio ? (
+                        <p className="px-3 py-2 text-sm text-text-muted">Buscando...</p>
+                      ) : resultadosServicio.length === 0 ? (
+                        <p className="px-3 py-2 text-sm text-text-muted">Sin resultados</p>
+                      ) : (
+                        resultadosServicio.map((s) => (
+                          <button
+                            type="button"
+                            key={s.id}
+                            onClick={() => handleSeleccionarServicio(s)}
+                            className="w-full text-left px-3 py-2 hover:bg-surface transition-colors border-b border-border last:border-0"
+                          >
+                            <p className="text-sm font-medium text-text">{s.nombre}</p>
+                            <p className="text-xs text-text-muted">
+                              Efectivo {formatoMoneda(Number(s.precioEfectivo))} · Tarjeta{' '}
+                              {formatoMoneda(Number(s.precioTarjeta))}
+                            </p>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col w-16">
+                  <label className="text-sm font-medium text-text mb-2">Nº</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={cantidad}
+                    onChange={(e) => setCantidad(e.target.value)}
+                    className="border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors"
+                  />
                 </div>
 
                 <div className="flex flex-col w-32">
-                  <label className="text-sm font-medium text-text mb-2">Precio</label>
+                  <label className="text-sm font-medium text-text mb-2">Precio Unitario</label>
                   <input
                     type="number"
-                    value={precio}
-                    onChange={(e) => setPrecio(e.target.value)}
+                    value={precioUnitario}
+                    onChange={(e) => setPrecioUnitario(e.target.value)}
                     className="border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  disabled={agregando || !servicioId}
+                  disabled={agregando || !servicioSeleccionado}
                   className="bg-primary hover:bg-primary-dark text-white font-medium rounded-lg px-4 py-2 transition-colors disabled:opacity-60"
                 >
                   {agregando ? 'Agregando...' : 'Agregar'}
@@ -247,9 +411,7 @@ export default function OrdenDetalle() {
         <div className="flex flex-col gap-4">
           <div className="bg-white rounded-2xl shadow-sm border border-border p-6">
             <p className="text-sm text-text-muted">Total</p>
-            <p className="text-3xl font-bold text-text mt-1">
-              ${total.toLocaleString('es-AR')}
-            </p>
+            <p className="text-3xl font-bold text-text mt-1">{formatoMoneda(total)}</p>
 
             <div className="mt-4 pt-4 border-t border-border">
               <p className="text-sm text-text-muted">Estado</p>
@@ -263,28 +425,56 @@ export default function OrdenDetalle() {
             )}
 
             {orden.estado === 'ABIERTA' && (
-              <div className="flex flex-col gap-2 mt-4">
-                {METODOS.map((m) => (
-                  <button
-                    key={m.key}
-                    onClick={() => handleCobrar(m.key)}
-                    disabled={cobrando || orden.items.length === 0}
-                    className="bg-primary hover:bg-primary-dark text-white font-medium rounded-lg py-2 transition-colors disabled:opacity-60"
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-text mb-2">Método de pago</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {METODOS_UI.map((m) => (
+                      <button
+                        key={m.key}
+                        type="button"
+                        onClick={() => setMetodoUI(m.key)}
+                        className={`text-sm font-medium rounded-lg py-2 transition-colors border ${
+                          metodoUI === m.key
+                            ? 'bg-primary text-white border-primary'
+                            : 'bg-white text-text border-border hover:bg-surface'
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleCobrar}
+                  disabled={cobrando || orden.items.length === 0}
+                  className="w-full mt-4 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg py-2 transition-colors disabled:opacity-60"
+                >
+                  {cobrando ? 'Cobrando...' : 'Cobrar'}
+                </button>
+              </>
             )}
 
             {orden.estado === 'COBRADA' && pago && (
               <div className="mt-4 bg-green-50 border border-green-100 rounded-lg px-3 py-3">
                 <p className="text-sm text-green-700">
-                  Cobrada con {METODOS.find((m) => m.key === pago.metodo)?.label ?? pago.metodo}
+                  Cobrada con {METODO_LABEL_LARGO[pago.metodo] ?? pago.metodo}
                 </p>
-                <p className="text-lg font-bold text-green-700 mt-1">
-                  ${Number(pago.monto).toLocaleString('es-AR')}
-                </p>
+                <p className="text-lg font-bold text-green-700 mt-1">{formatoMoneda(Number(pago.monto))}</p>
+              </div>
+            )}
+
+            {orden.estado === 'COBRADA' && pago && pago.metodo !== 'EFECTIVO' && !pago.acreditado && (
+              <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg px-3 py-3">
+                <p className="text-sm font-medium text-amber-700">⏳ Pendiente de acreditación</p>
+                <button
+                  onClick={handleAcreditar}
+                  disabled={acreditando}
+                  className="w-full mt-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg py-2 transition-colors disabled:opacity-60"
+                >
+                  {acreditando ? 'Confirmando...' : 'Confirmar acreditación'}
+                </button>
               </div>
             )}
 

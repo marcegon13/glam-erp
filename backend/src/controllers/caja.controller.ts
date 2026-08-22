@@ -27,23 +27,46 @@ export const listarCaja = async (req: AuthRequest, res: Response) => {
       orderBy: { fecha: 'desc' }
     })
 
-    const ingresos = movimientosDelDia
+    const ordenIds = movimientosDelDia
+      .filter((m) => m.tipo === 'INGRESO' && m.referenciaId != null)
+      .map((m) => m.referenciaId as number)
+
+    const pagos = ordenIds.length > 0
+      ? await prisma.pago.findMany({ where: { ordenId: { in: ordenIds } } })
+      : []
+    const acreditadoPorOrden = new Map(pagos.map((p) => [p.ordenId, p.acreditado]))
+
+    const movimientosConEstado = movimientosDelDia.map((m) => ({
+      ...m,
+      acreditado:
+        m.tipo === 'EGRESO' ? true : acreditadoPorOrden.get(m.referenciaId ?? -1) ?? true
+    }))
+
+    const ingresos = movimientosConEstado
       .filter((m) => m.tipo === 'INGRESO')
       .reduce((suma, m) => suma + Number(m.monto), 0)
-    const egresos = movimientosDelDia
+    const egresos = movimientosConEstado
       .filter((m) => m.tipo === 'EGRESO')
+      .reduce((suma, m) => suma + Number(m.monto), 0)
+    const totalAcreditado = movimientosConEstado
+      .filter((m) => m.tipo === 'INGRESO' && m.acreditado)
+      .reduce((suma, m) => suma + Number(m.monto), 0)
+    const totalPendiente = movimientosConEstado
+      .filter((m) => m.tipo === 'INGRESO' && !m.acreditado)
       .reduce((suma, m) => suma + Number(m.monto), 0)
 
     const movimientos = tipo
-      ? movimientosDelDia.filter((m) => m.tipo === tipo)
-      : movimientosDelDia
+      ? movimientosConEstado.filter((m) => m.tipo === tipo)
+      : movimientosConEstado
 
     res.json({
       movimientos,
       totales: {
         ingresos,
         egresos,
-        balance: ingresos - egresos
+        balance: ingresos - egresos,
+        totalAcreditado,
+        totalPendiente
       }
     })
   } catch {
