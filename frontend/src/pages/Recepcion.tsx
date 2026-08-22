@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
+import ModalCliente from '../components/ModalCliente'
 import api from '../api/axios'
 
 interface Cliente {
@@ -29,12 +30,6 @@ export default function Recepcion() {
   const [seleccionadoId, setSeleccionadoId] = useState<number | null>(null)
 
   const [modalCliente, setModalCliente] = useState(false)
-  const [nuevoNombre, setNuevoNombre] = useState('')
-  const [nuevoApellido, setNuevoApellido] = useState('')
-  const [nuevoTelefono, setNuevoTelefono] = useState('')
-  const [nuevoEmail, setNuevoEmail] = useState('')
-  const [guardandoCliente, setGuardandoCliente] = useState(false)
-  const [errorCliente, setErrorCliente] = useState('')
 
   const [modalOrden, setModalOrden] = useState(false)
   const [ordenCliente, setOrdenCliente] = useState<Cliente | null>(null)
@@ -67,34 +62,12 @@ export default function Recepcion() {
   }, [busqueda])
 
   const abrirModalCliente = () => {
-    setNuevoNombre('')
-    setNuevoApellido('')
-    setNuevoTelefono('')
-    setNuevoEmail('')
-    setErrorCliente('')
     setModalCliente(true)
   }
 
-  const handleGuardarCliente = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setErrorCliente('')
-    setGuardandoCliente(true)
-
-    try {
-      const { data } = await api.post('/clientes', {
-        nombre: nuevoNombre,
-        apellido: nuevoApellido,
-        telefono: nuevoTelefono || undefined,
-        email: nuevoEmail || undefined,
-      })
-      setResultados((prev) => [data, ...prev])
-      setSeleccionadoId(data.id)
-      setModalCliente(false)
-    } catch (err: any) {
-      setErrorCliente(err.response?.data?.error ?? 'Error al crear cliente')
-    } finally {
-      setGuardandoCliente(false)
-    }
+  const handleClienteCreado = (cliente: Cliente) => {
+    setResultados((prev) => [cliente, ...prev])
+    setSeleccionadoId(cliente.id)
   }
 
   const abrirModalOrden = async (cliente: Cliente, tipo: TipoOrden) => {
@@ -191,77 +164,7 @@ export default function Recepcion() {
       </div>
 
       {modalCliente && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center px-4 z-50">
-          <div className="bg-white rounded-2xl shadow-sm border border-[#DDDDE8] w-full max-w-sm py-8 px-8">
-            <h2 className="text-lg font-bold text-[#1A1A2E] mb-6">Nuevo cliente</h2>
-
-            <form onSubmit={handleGuardarCliente} className="flex flex-col">
-              <div className="flex flex-col">
-                <label className="text-sm font-medium text-[#1A1A2E] mb-2">Nombre</label>
-                <input
-                  value={nuevoNombre}
-                  onChange={(e) => setNuevoNombre(e.target.value)}
-                  required
-                  className="border border-[#DDDDE8] rounded-lg px-3 py-2 outline-none focus:border-[#7C3AED] transition-colors"
-                />
-              </div>
-
-              <div className="flex flex-col mt-4">
-                <label className="text-sm font-medium text-[#1A1A2E] mb-2">Apellido</label>
-                <input
-                  value={nuevoApellido}
-                  onChange={(e) => setNuevoApellido(e.target.value)}
-                  required
-                  className="border border-[#DDDDE8] rounded-lg px-3 py-2 outline-none focus:border-[#7C3AED] transition-colors"
-                />
-              </div>
-
-              <div className="flex flex-col mt-4">
-                <label className="text-sm font-medium text-[#1A1A2E] mb-2">Teléfono</label>
-                <input
-                  value={nuevoTelefono}
-                  onChange={(e) => setNuevoTelefono(e.target.value)}
-                  className="border border-[#DDDDE8] rounded-lg px-3 py-2 outline-none focus:border-[#7C3AED] transition-colors"
-                />
-              </div>
-
-              <div className="flex flex-col mt-4">
-                <label className="text-sm font-medium text-[#1A1A2E] mb-2">
-                  Email <span className="text-[#6B6B80] font-normal">(opcional)</span>
-                </label>
-                <input
-                  type="email"
-                  value={nuevoEmail}
-                  onChange={(e) => setNuevoEmail(e.target.value)}
-                  className="border border-[#DDDDE8] rounded-lg px-3 py-2 outline-none focus:border-[#7C3AED] transition-colors"
-                />
-              </div>
-
-              {errorCliente && (
-                <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mt-4">
-                  {errorCliente}
-                </p>
-              )}
-
-              <div className="flex gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setModalCliente(false)}
-                  className="flex-1 border border-[#DDDDE8] text-[#6B6B80] font-medium rounded-lg py-2 transition-colors hover:bg-[#F8F8FC]"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={guardandoCliente}
-                  className="flex-1 bg-[#7C3AED] hover:bg-[#5B21B6] text-white font-semibold rounded-lg py-2 transition-colors disabled:opacity-60"
-                >
-                  {guardandoCliente ? 'Guardando...' : 'Guardar'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <ModalCliente onClose={() => setModalCliente(false)} onSaved={handleClienteCreado} />
       )}
 
       {modalOrden && ordenCliente && (

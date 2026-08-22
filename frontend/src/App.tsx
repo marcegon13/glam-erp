@@ -6,6 +6,8 @@ import Turnos from './pages/Turnos'
 import OrdenDetalle from './pages/OrdenDetalle'
 import Profesionales from './pages/Profesionales'
 import Servicios from './pages/Servicios'
+import Clientes from './pages/Clientes'
+import ClienteFicha from './pages/ClienteFicha'
 import { authStore } from './store/auth'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -66,6 +68,22 @@ export default function App() {
           element={
             <RequireAuth>
               <Servicios />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/clientes"
+          element={
+            <RequireAuth>
+              <Clientes />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/clientes/:id"
+          element={
+            <RequireAuth>
+              <ClienteFicha />
             </RequireAuth>
           }
         />
