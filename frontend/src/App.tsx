@@ -11,6 +11,9 @@ import Servicios from './pages/Servicios'
 import Clientes from './pages/Clientes'
 import ClienteFicha from './pages/ClienteFicha'
 import Caja from './pages/Caja'
+import Vales from './pages/Vales'
+import Liquidaciones from './pages/Liquidaciones'
+import LegajoProfesional from './pages/LegajoProfesional'
 import { authStore } from './store/auth'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -111,6 +114,30 @@ export default function App() {
           element={
             <RequireAuth>
               <Caja />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/vales"
+          element={
+            <RequireAuth>
+              <Vales />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/liquidaciones"
+          element={
+            <RequireAuth>
+              <Liquidaciones />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/liquidaciones/:profesionalId/:periodo"
+          element={
+            <RequireAuth>
+              <LegajoProfesional />
             </RequireAuth>
           }
         />

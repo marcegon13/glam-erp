@@ -24,52 +24,128 @@ async function calcularProduccion(tenantId: number, profesionalId: number, perio
 
   return ordenes.reduce(
     (total, orden) =>
-      total + orden.items.reduce((suma, item) => suma + Number(item.precioAplicado), 0),
+      total + orden.items.reduce((suma, item) => suma + Number(item.precioAplicado) * item.cantidad, 0),
     0
   )
 }
 
-export const calcularLiquidacion = async (req: AuthRequest, res: Response) => {
-  const { profesionalId, periodo } = req.body
+async function produccionPorDia(tenantId: number, profesionalId: number, periodo: string) {
+  const { inicio, fin } = rangoPeriodo(periodo)
 
-  if (!profesionalId || !periodo) {
-    res.status(400).json({ error: 'Profesional y período son requeridos' })
-    return
+  const ordenes = await prisma.orden.findMany({
+    where: {
+      tenantId,
+      profesionalId,
+      estado: 'COBRADA',
+      fecha: { gte: inicio, lt: fin }
+    },
+    include: { items: true }
+  })
+
+  const mapa = new Map<string, number>()
+  for (const orden of ordenes) {
+    const fechaStr = orden.fecha.toISOString().slice(0, 10)
+    const totalOrden = orden.items.reduce((suma, item) => suma + Number(item.precioAplicado) * item.cantidad, 0)
+    mapa.set(fechaStr, (mapa.get(fechaStr) ?? 0) + totalOrden)
   }
 
+  return Array.from(mapa.entries())
+    .map(([fecha, total]) => ({ fecha, total }))
+    .sort((a, b) => a.fecha.localeCompare(b.fecha))
+}
+
+async function valesPendientesDelPeriodo(tenantId: number, profesionalId: number, periodo: string) {
+  const vales = await prisma.vale.findMany({
+    where: { tenantId, profesionalId, periodo, descontado: false }
+  })
+  return vales.reduce((suma, v) => suma + Number(v.monto), 0)
+}
+
+export const resumenPeriodo = async (req: AuthRequest, res: Response) => {
+  const { periodo } = req.params
+
   try {
-    const profesional = await prisma.profesional.findFirst({
-      where: { id: profesionalId, tenantId: req.tenantId }
+    const profesionales = await prisma.profesional.findMany({
+      where: { tenantId: req.tenantId, activo: true },
+      orderBy: { apellido: 'asc' }
     })
 
-    if (!profesional) {
-      res.status(404).json({ error: 'Profesional no encontrado' })
-      return
-    }
+    const resumen = await Promise.all(
+      profesionales.map(async (profesional) => {
+        const produccion = await calcularProduccion(req.tenantId!, profesional.id, periodo)
+        const valesPendientes = await valesPendientesDelPeriodo(req.tenantId!, profesional.id, periodo)
+        const porcentaje = Number(profesional.porcentaje ?? 0)
+        const comision = (produccion * porcentaje) / 100
 
-    const produccion = await calcularProduccion(req.tenantId!, profesionalId, periodo)
-    const porcentaje = Number(profesional.porcentaje ?? 0)
-    const sueldoBase = Number(profesional.sueldoBase ?? 0)
-    const comision = (produccion * porcentaje) / 100
-    const sueldoNeto = sueldoBase + comision
+        const liquidacion = await prisma.liquidacion.findUnique({
+          where: { profesionalId_periodo: { profesionalId: profesional.id, periodo } }
+        })
 
-    res.json({
-      profesionalId,
-      periodo,
-      produccion,
-      comision,
-      sueldoBase,
-      adelantos: 0,
-      descuentos: 0,
-      sueldoNeto
-    })
+        const estado = !liquidacion ? 'SIN_LIQUIDAR' : liquidacion.aprobada ? 'APROBADA' : 'BORRADOR'
+
+        return {
+          profesional: {
+            id: profesional.id,
+            nombre: profesional.nombre,
+            apellido: profesional.apellido,
+            tipo: profesional.tipo
+          },
+          produccion,
+          valesPendientes,
+          porcentaje,
+          comision,
+          estado,
+          liquidacionId: liquidacion?.id ?? null,
+          sueldoNeto: liquidacion ? Number(liquidacion.sueldoNeto) : null
+        }
+      })
+    )
+
+    res.json(resumen)
   } catch {
-    res.status(500).json({ error: 'Error al calcular liquidación' })
+    res.status(500).json({ error: 'Error al obtener el resumen del período' })
   }
 }
 
-export const aprobarLiquidacion = async (req: AuthRequest, res: Response) => {
-  const { profesionalId, periodo, adelantos, descuentos } = req.body
+export const obtenerLegajo = async (req: AuthRequest, res: Response) => {
+  const profesionalId = Number(req.params.profesionalId)
+  const { periodo } = req.params
+
+  try {
+    const profesional = await prisma.profesional.findFirst({
+      where: { id: profesionalId, tenantId: req.tenantId }
+    })
+
+    if (!profesional) {
+      res.status(404).json({ error: 'Profesional no encontrado' })
+      return
+    }
+
+    const [produccionDiaria, vales, liquidacion] = await Promise.all([
+      produccionPorDia(req.tenantId!, profesionalId, periodo),
+      prisma.vale.findMany({
+        where: { tenantId: req.tenantId, profesionalId, periodo },
+        orderBy: { fecha: 'asc' }
+      }),
+      prisma.liquidacion.findUnique({
+        where: { profesionalId_periodo: { profesionalId, periodo } }
+      })
+    ])
+
+    res.json({
+      profesional,
+      periodo,
+      produccionDiaria,
+      vales,
+      liquidacion
+    })
+  } catch {
+    res.status(500).json({ error: 'Error al obtener el legajo' })
+  }
+}
+
+export const guardarBorrador = async (req: AuthRequest, res: Response) => {
+  const { profesionalId, periodo, cargasSociales, descuentos, otros, notas } = req.body
 
   if (!profesionalId || !periodo) {
     res.status(400).json({ error: 'Profesional y período son requeridos' })
@@ -86,13 +162,25 @@ export const aprobarLiquidacion = async (req: AuthRequest, res: Response) => {
       return
     }
 
+    const existente = await prisma.liquidacion.findUnique({
+      where: { profesionalId_periodo: { profesionalId, periodo } }
+    })
+
+    if (existente?.aprobada) {
+      res.status(400).json({ error: 'La liquidación de este período ya está aprobada' })
+      return
+    }
+
     const produccion = await calcularProduccion(req.tenantId!, profesionalId, periodo)
+    const vales = await valesPendientesDelPeriodo(req.tenantId!, profesionalId, periodo)
     const porcentaje = Number(profesional.porcentaje ?? 0)
-    const sueldoBase = Number(profesional.sueldoBase ?? 0)
     const comision = (produccion * porcentaje) / 100
-    const adelantosNum = Number(adelantos ?? 0)
+
+    const cargasSocialesNum = Number(cargasSociales ?? 0)
     const descuentosNum = Number(descuentos ?? 0)
-    const sueldoNeto = sueldoBase + comision - adelantosNum - descuentosNum
+    const otrosNum = Number(otros ?? 0)
+
+    const sueldoNeto = comision - vales - cargasSocialesNum - descuentosNum - otrosNum
 
     const liquidacion = await prisma.liquidacion.upsert({
       where: { profesionalId_periodo: { profesionalId, periodo } },
@@ -102,29 +190,34 @@ export const aprobarLiquidacion = async (req: AuthRequest, res: Response) => {
         periodo,
         produccion,
         comision,
-        sueldoBase,
-        adelantos: adelantosNum,
+        vales,
+        cargasSociales: cargasSocialesNum,
         descuentos: descuentosNum,
+        otros: otrosNum,
+        notas,
         sueldoNeto,
         aprobada: false
       },
       update: {
         produccion,
         comision,
-        sueldoBase,
-        adelantos: adelantosNum,
+        vales,
+        cargasSociales: cargasSocialesNum,
         descuentos: descuentosNum,
+        otros: otrosNum,
+        notas,
         sueldoNeto
-      }
+      },
+      include: { profesional: true }
     })
 
     res.json(liquidacion)
   } catch {
-    res.status(500).json({ error: 'Error al aprobar liquidación' })
+    res.status(500).json({ error: 'Error al guardar el borrador' })
   }
 }
 
-export const aprobarCierre = async (req: AuthRequest, res: Response) => {
+export const aprobarLiquidacion = async (req: AuthRequest, res: Response) => {
   const id = Number(req.params.id)
 
   try {
@@ -138,9 +231,24 @@ export const aprobarCierre = async (req: AuthRequest, res: Response) => {
         throw new Error('LIQUIDACION_NO_ENCONTRADA')
       }
 
+      if (liquidacion.aprobada) {
+        throw new Error('LIQUIDACION_YA_APROBADA')
+      }
+
       const actualizada = await tx.liquidacion.update({
         where: { id },
-        data: { aprobada: true }
+        data: { aprobada: true },
+        include: { profesional: true }
+      })
+
+      await tx.vale.updateMany({
+        where: {
+          tenantId: req.tenantId,
+          profesionalId: liquidacion.profesionalId,
+          periodo: liquidacion.periodo,
+          descontado: false
+        },
+        data: { descontado: true }
       })
 
       await tx.caja.create({
@@ -163,45 +271,10 @@ export const aprobarCierre = async (req: AuthRequest, res: Response) => {
       res.status(404).json({ error: 'Liquidación no encontrada' })
       return
     }
-    res.status(500).json({ error: 'Error al cerrar liquidación' })
-  }
-}
-
-export const listarLiquidaciones = async (req: AuthRequest, res: Response) => {
-  const { periodo } = req.query
-
-  try {
-    const liquidaciones = await prisma.liquidacion.findMany({
-      where: {
-        tenantId: req.tenantId,
-        ...(periodo ? { periodo: periodo as string } : {})
-      },
-      orderBy: { creadoEn: 'desc' },
-      include: { profesional: true }
-    })
-
-    res.json(liquidaciones)
-  } catch {
-    res.status(500).json({ error: 'Error al listar liquidaciones' })
-  }
-}
-
-export const obtenerLiquidacion = async (req: AuthRequest, res: Response) => {
-  const id = Number(req.params.id)
-
-  try {
-    const liquidacion = await prisma.liquidacion.findFirst({
-      where: { id, tenantId: req.tenantId },
-      include: { profesional: true }
-    })
-
-    if (!liquidacion) {
-      res.status(404).json({ error: 'Liquidación no encontrada' })
+    if (error.message === 'LIQUIDACION_YA_APROBADA') {
+      res.status(400).json({ error: 'La liquidación ya está aprobada' })
       return
     }
-
-    res.json(liquidacion)
-  } catch {
-    res.status(500).json({ error: 'Error al obtener liquidación' })
+    res.status(500).json({ error: 'Error al aprobar liquidación' })
   }
 }

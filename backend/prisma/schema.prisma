@@ -25,6 +25,7 @@ model Tenant {
   turnos        Turno[]
   ausencias     Ausencia[]
   fichaTrabajos FichaTrabajo[]
+  vales         Vale[]
 
   @@map("tenants")
 }
@@ -79,6 +80,7 @@ model Profesional {
   liquidaciones Liquidacion[]
   turnos        Turno[]
   ausencias     Ausencia[]
+  vales         Vale[]
 
   @@map("profesionales")
 }
@@ -232,18 +234,22 @@ enum TipoCaja {
 
 // ─── LIQUIDACIONES ─────────────────────────────────────────────────────────
 model Liquidacion {
-  id            Int      @id @default(autoincrement())
-  tenantId      Int
-  profesionalId Int
-  periodo       String
-  produccion    Decimal  @db.Decimal(10, 2)
-  comision      Decimal  @db.Decimal(10, 2)
-  sueldoBase    Decimal  @db.Decimal(10, 2)
-  adelantos     Decimal  @db.Decimal(10, 2) @default(0)
-  descuentos    Decimal  @db.Decimal(10, 2) @default(0)
-  sueldoNeto    Decimal  @db.Decimal(10, 2)
-  aprobada      Boolean  @default(false)
-  creadoEn      DateTime @default(now())
+  id             Int      @id @default(autoincrement())
+  tenantId       Int
+  profesionalId  Int
+  periodo        String
+  produccion     Decimal  @db.Decimal(10, 2)
+  comision       Decimal  @db.Decimal(10, 2)
+  sueldoBase     Decimal  @db.Decimal(10, 2) @default(0)
+  adelantos      Decimal  @db.Decimal(10, 2) @default(0)
+  vales          Decimal  @db.Decimal(10, 2) @default(0)
+  cargasSociales Decimal  @db.Decimal(10, 2) @default(0)
+  descuentos     Decimal  @db.Decimal(10, 2) @default(0)
+  otros          Decimal  @db.Decimal(10, 2) @default(0)
+  notas          String?
+  sueldoNeto     Decimal  @db.Decimal(10, 2)
+  aprobada       Boolean  @default(false)
+  creadoEn       DateTime @default(now())
 
   tenant      Tenant      @relation(fields: [tenantId], references: [id])
   profesional Profesional @relation(fields: [profesionalId], references: [id])
@@ -295,4 +301,22 @@ model Ausencia {
 
   @@unique([profesionalId, fecha])
   @@map("ausencias")
+}
+
+// ─── VALES ─────────────────────────────────────────────────────────────────
+model Vale {
+  id            Int      @id @default(autoincrement())
+  tenantId      Int
+  profesionalId Int
+  monto         Decimal  @db.Decimal(10, 2)
+  concepto      String?
+  fecha         DateTime @default(now())
+  periodo       String
+  descontado    Boolean  @default(false)
+  creadoEn      DateTime @default(now())
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  profesional Profesional @relation(fields: [profesionalId], references: [id])
+
+  @@map("vales")
 }

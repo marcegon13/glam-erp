@@ -1,21 +1,19 @@
 import { Router } from 'express'
 import { authMiddleware } from '../middleware/auth.js'
 import {
-  calcularLiquidacion,
-  aprobarLiquidacion,
-  aprobarCierre,
-  listarLiquidaciones,
-  obtenerLiquidacion
+  resumenPeriodo,
+  obtenerLegajo,
+  guardarBorrador,
+  aprobarLiquidacion
 } from '../controllers/liquidaciones.controller.js'
 
 const router = Router()
 
 router.use(authMiddleware)
 
-router.get('/', listarLiquidaciones)
-router.get('/:id', obtenerLiquidacion)
-router.post('/calcular', calcularLiquidacion)
-router.post('/aprobar', aprobarLiquidacion)
-router.post('/:id/cerrar', aprobarCierre)
+router.get('/periodo/:periodo', resumenPeriodo)
+router.get('/legajo/:profesionalId/:periodo', obtenerLegajo)
+router.post('/borrador', guardarBorrador)
+router.post('/:id/aprobar', aprobarLiquidacion)
 
 export default router

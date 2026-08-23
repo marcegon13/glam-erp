@@ -9,6 +9,7 @@ const MENU = [
   { key: 'profesionales', label: 'Profesionales', icon: '💇', path: '/profesionales' },
   { key: 'servicios', label: 'Servicios', icon: '✨', path: '/servicios' },
   { key: 'caja', label: 'Caja', icon: '💰', path: '/caja' },
+  { key: 'vales', label: 'Vales', icon: '💰', path: '/vales' },
   { key: 'liquidaciones', label: 'Liquidaciones', icon: '📊', path: '/liquidaciones' },
 ]
 
