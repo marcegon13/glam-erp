@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { authMiddleware } from '../middleware/auth.js'
+import { authMiddleware, requireRol } from '../middleware/auth.js'
 import {
   resumenPeriodo,
   obtenerLegajo,
@@ -10,6 +10,7 @@ import {
 const router = Router()
 
 router.use(authMiddleware)
+router.use(requireRol('ADMINISTRADOR', 'OFICINA'))
 
 router.get('/periodo/:periodo', resumenPeriodo)
 router.get('/legajo/:profesionalId/:periodo', obtenerLegajo)

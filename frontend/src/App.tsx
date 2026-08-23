@@ -14,6 +14,7 @@ import Caja from './pages/Caja'
 import Vales from './pages/Vales'
 import Liquidaciones from './pages/Liquidaciones'
 import LegajoProfesional from './pages/LegajoProfesional'
+import CierreTurno from './pages/CierreTurno'
 import { authStore } from './store/auth'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -22,6 +23,19 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   }
   return children
 }
+
+function RequireRol({ roles, children }: { roles: string[]; children: React.ReactNode }) {
+  const rol = authStore.getUser()?.rol
+  if (rol && !roles.includes(rol)) {
+    return <Navigate to="/dashboard" replace />
+  }
+  return children
+}
+
+const ADMIN_CAJERA = ['ADMINISTRADOR', 'CAJERA']
+const ADMIN_CAJERA_OFICINA = ['ADMINISTRADOR', 'CAJERA', 'OFICINA']
+const ADMIN_OFICINA = ['ADMINISTRADOR', 'OFICINA']
+const SOLO_ADMIN = ['ADMINISTRADOR']
 
 export default function App() {
   return (
@@ -41,7 +55,9 @@ export default function App() {
           path="/recepcion"
           element={
             <RequireAuth>
-              <Recepcion />
+              <RequireRol roles={ADMIN_CAJERA}>
+                <Recepcion />
+              </RequireRol>
             </RequireAuth>
           }
         />
@@ -49,7 +65,9 @@ export default function App() {
           path="/turnos"
           element={
             <RequireAuth>
-              <Turnos />
+              <RequireRol roles={ADMIN_CAJERA}>
+                <Turnos />
+              </RequireRol>
             </RequireAuth>
           }
         />
@@ -57,7 +75,9 @@ export default function App() {
           path="/turnos/archivados"
           element={
             <RequireAuth>
-              <TurnosArchivados />
+              <RequireRol roles={ADMIN_CAJERA}>
+                <TurnosArchivados />
+              </RequireRol>
             </RequireAuth>
           }
         />
@@ -65,7 +85,9 @@ export default function App() {
           path="/ausencias"
           element={
             <RequireAuth>
-              <Ausencias />
+              <RequireRol roles={ADMIN_CAJERA}>
+                <Ausencias />
+              </RequireRol>
             </RequireAuth>
           }
         />
@@ -73,7 +95,9 @@ export default function App() {
           path="/ordenes/:id"
           element={
             <RequireAuth>
-              <OrdenDetalle />
+              <RequireRol roles={ADMIN_CAJERA}>
+                <OrdenDetalle />
+              </RequireRol>
             </RequireAuth>
           }
         />
@@ -81,7 +105,9 @@ export default function App() {
           path="/profesionales"
           element={
             <RequireAuth>
-              <Profesionales />
+              <RequireRol roles={SOLO_ADMIN}>
+                <Profesionales />
+              </RequireRol>
             </RequireAuth>
           }
         />
@@ -89,7 +115,9 @@ export default function App() {
           path="/servicios"
           element={
             <RequireAuth>
-              <Servicios />
+              <RequireRol roles={SOLO_ADMIN}>
+                <Servicios />
+              </RequireRol>
             </RequireAuth>
           }
         />
@@ -97,7 +125,9 @@ export default function App() {
           path="/clientes"
           element={
             <RequireAuth>
-              <Clientes />
+              <RequireRol roles={ADMIN_CAJERA_OFICINA}>
+                <Clientes />
+              </RequireRol>
             </RequireAuth>
           }
         />
@@ -105,7 +135,9 @@ export default function App() {
           path="/clientes/:id"
           element={
             <RequireAuth>
-              <ClienteFicha />
+              <RequireRol roles={ADMIN_CAJERA_OFICINA}>
+                <ClienteFicha />
+              </RequireRol>
             </RequireAuth>
           }
         />
@@ -113,7 +145,19 @@ export default function App() {
           path="/caja"
           element={
             <RequireAuth>
-              <Caja />
+              <RequireRol roles={ADMIN_CAJERA_OFICINA}>
+                <Caja />
+              </RequireRol>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/cierre-turno"
+          element={
+            <RequireAuth>
+              <RequireRol roles={ADMIN_CAJERA}>
+                <CierreTurno />
+              </RequireRol>
             </RequireAuth>
           }
         />
@@ -121,7 +165,9 @@ export default function App() {
           path="/vales"
           element={
             <RequireAuth>
-              <Vales />
+              <RequireRol roles={ADMIN_OFICINA}>
+                <Vales />
+              </RequireRol>
             </RequireAuth>
           }
         />
@@ -129,7 +175,9 @@ export default function App() {
           path="/liquidaciones"
           element={
             <RequireAuth>
-              <Liquidaciones />
+              <RequireRol roles={ADMIN_OFICINA}>
+                <Liquidaciones />
+              </RequireRol>
             </RequireAuth>
           }
         />
@@ -137,7 +185,9 @@ export default function App() {
           path="/liquidaciones/:profesionalId/:periodo"
           element={
             <RequireAuth>
-              <LegajoProfesional />
+              <RequireRol roles={ADMIN_OFICINA}>
+                <LegajoProfesional />
+              </RequireRol>
             </RequireAuth>
           }
         />

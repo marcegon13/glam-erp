@@ -14,6 +14,7 @@ import cajaRoutes from './routes/caja.routes.js'
 import fichaRoutes from './routes/ficha.routes.js'
 import valesRoutes from './routes/vales.routes.js'
 import dashboardRoutes from './routes/dashboard.routes.js'
+import turnosCajaRoutes from './routes/turnos-caja.routes.js'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -37,6 +38,7 @@ app.use('/api/caja', cajaRoutes)
 app.use('/api/ficha', fichaRoutes)
 app.use('/api/vales', valesRoutes)
 app.use('/api/dashboard', dashboardRoutes)
+app.use('/api/turnos-caja', turnosCajaRoutes)
 
 const archivarTurnosAlIniciar = async () => {
   try {

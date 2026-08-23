@@ -2,15 +2,22 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { authStore } from '../store/auth'
 
 const MENU = [
-  { key: 'inicio', label: 'Inicio', icon: '🏠', path: '/dashboard' },
-  { key: 'recepcion', label: 'Recepción', icon: '🗓️', path: '/recepcion' },
-  { key: 'turnos', label: 'Turnos', icon: '📅', path: '/turnos' },
-  { key: 'clientes', label: 'Clientes', icon: '👥', path: '/clientes' },
-  { key: 'profesionales', label: 'Profesionales', icon: '💇', path: '/profesionales' },
-  { key: 'servicios', label: 'Servicios', icon: '✨', path: '/servicios' },
-  { key: 'caja', label: 'Caja', icon: '💰', path: '/caja' },
-  { key: 'vales', label: 'Vales', icon: '💰', path: '/vales' },
-  { key: 'liquidaciones', label: 'Liquidaciones', icon: '📊', path: '/liquidaciones' },
+  {
+    key: 'inicio',
+    label: 'Inicio',
+    icon: '🏠',
+    path: '/dashboard',
+    roles: ['ADMINISTRADOR', 'CAJERA', 'OFICINA', 'ESTILISTA', 'MANICURA'],
+  },
+  { key: 'recepcion', label: 'Recepción', icon: '🗓️', path: '/recepcion', roles: ['ADMINISTRADOR', 'CAJERA'] },
+  { key: 'turnos', label: 'Turnos', icon: '📅', path: '/turnos', roles: ['ADMINISTRADOR', 'CAJERA'] },
+  { key: 'clientes', label: 'Clientes', icon: '👥', path: '/clientes', roles: ['ADMINISTRADOR', 'CAJERA', 'OFICINA'] },
+  { key: 'profesionales', label: 'Profesionales', icon: '💇', path: '/profesionales', roles: ['ADMINISTRADOR'] },
+  { key: 'servicios', label: 'Servicios', icon: '✨', path: '/servicios', roles: ['ADMINISTRADOR'] },
+  { key: 'caja', label: 'Caja', icon: '💰', path: '/caja', roles: ['ADMINISTRADOR', 'CAJERA', 'OFICINA'] },
+  { key: 'cierre-turno', label: 'Cierre de Turno', icon: '🏦', path: '/cierre-turno', roles: ['ADMINISTRADOR', 'CAJERA'] },
+  { key: 'vales', label: 'Vales', icon: '💰', path: '/vales', roles: ['ADMINISTRADOR', 'OFICINA'] },
+  { key: 'liquidaciones', label: 'Liquidaciones', icon: '📊', path: '/liquidaciones', roles: ['ADMINISTRADOR', 'OFICINA'] },
 ]
 
 interface LayoutProps {
@@ -22,6 +29,9 @@ export default function Layout({ titulo, children }: LayoutProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const usuario = authStore.getUser()
+  const rol = usuario?.rol
+
+  const menuVisible = MENU.filter((item) => !rol || item.roles.includes(rol))
 
   const handleSalir = () => {
     authStore.clear()
@@ -37,7 +47,7 @@ export default function Layout({ titulo, children }: LayoutProps) {
         </div>
 
         <nav className="flex flex-col gap-1 px-3">
-          {MENU.map((item) => {
+          {menuVisible.map((item) => {
             const activo = location.pathname === item.path
             return (
               <button

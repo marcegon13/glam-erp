@@ -26,6 +26,7 @@ model Tenant {
   ausencias     Ausencia[]
   fichaTrabajos FichaTrabajo[]
   vales         Vale[]
+  turnosCaja    TurnoCaja[]
 
   @@map("tenants")
 }
@@ -47,9 +48,11 @@ model Usuario {
   activo     Boolean  @default(true)
   creadoEn   DateTime @default(now())
 
-  tenant        Tenant  @relation(fields: [tenantId], references: [id])
-  ordenes       Orden[]
-  turnosCreados Turno[]
+  tenant             Tenant      @relation(fields: [tenantId], references: [id])
+  ordenes            Orden[]
+  turnosCreados      Turno[]
+  turnosCajaAbiertos TurnoCaja[] @relation("TurnoCajaAbierto")
+  turnosCajaCerrados TurnoCaja[] @relation("TurnoCajaCerrado")
 
   @@unique([tenantId, email])
   @@map("usuarios")
@@ -319,4 +322,38 @@ model Vale {
   profesional Profesional @relation(fields: [profesionalId], references: [id])
 
   @@map("vales")
+}
+
+// ─── CIERRE DE TURNO DE CAJA ────────────────────────────────────────────────
+model TurnoCaja {
+  id              Int             @id @default(autoincrement())
+  tenantId        Int
+  tipo            TipoTurno
+  fecha           DateTime        @db.Date
+  cajera          String
+  fondoCambio     Decimal         @db.Decimal(10, 2)
+  estado          EstadoTurnoCaja @default(ABIERTO)
+  efectivoContado Decimal?        @db.Decimal(10, 2)
+  diferencia      Decimal?        @db.Decimal(10, 2)
+  observaciones   String?
+  abiertoPor      Int
+  cerradoPor      Int?
+  abiertaEn       DateTime        @default(now())
+  cerradaEn       DateTime?
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  abridor  Usuario  @relation("TurnoCajaAbierto", fields: [abiertoPor], references: [id])
+  cerrador Usuario? @relation("TurnoCajaCerrado", fields: [cerradoPor], references: [id])
+
+  @@map("turnos_caja")
+}
+
+enum TipoTurno {
+  MANIANA
+  TARDE
+}
+
+enum EstadoTurnoCaja {
+  ABIERTO
+  CERRADO
 }

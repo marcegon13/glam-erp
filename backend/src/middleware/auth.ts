@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
+import { Rol } from '@prisma/client'
 
 export interface AuthRequest extends Request {
   userId?: number
@@ -25,5 +26,15 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
     next()
   } catch {
     res.status(401).json({ error: 'Token inválido' })
+  }
+}
+
+export const requireRol = (...roles: Rol[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.rol || !roles.includes(req.rol as Rol)) {
+      res.status(403).json({ error: 'No tenés permisos para realizar esta acción' })
+      return
+    }
+    next()
   }
 }

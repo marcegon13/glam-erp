@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { authMiddleware } from '../middleware/auth.js'
+import { authMiddleware, requireRol } from '../middleware/auth.js'
 import {
   listarProfesionales,
   crearProfesional,
@@ -12,8 +12,8 @@ const router = Router()
 router.use(authMiddleware)
 
 router.get('/', listarProfesionales)
-router.post('/', crearProfesional)
-router.put('/:id', editarProfesional)
-router.delete('/:id', eliminarProfesional)
+router.post('/', requireRol('ADMINISTRADOR'), crearProfesional)
+router.put('/:id', requireRol('ADMINISTRADOR'), editarProfesional)
+router.delete('/:id', requireRol('ADMINISTRADOR'), eliminarProfesional)
 
 export default router
