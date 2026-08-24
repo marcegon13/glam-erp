@@ -22,3 +22,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+# Archivos multimedia y documentos
+*.jpeg
+*.jpg
+*.png
+*.gif
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.zip
+*.rar
+*.pdf
