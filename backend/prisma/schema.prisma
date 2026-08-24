@@ -29,6 +29,7 @@ model Tenant {
   turnosCaja        TurnoCaja[]
   nivelesPrecio     NivelPrecio[]
   metodosPagoConfig MetodoPagoConfig[]
+  gastosAdmin       GastoAdmin[]
 
   @@map("tenants")
 }
@@ -386,6 +387,21 @@ model Vale {
   profesional Profesional @relation(fields: [profesionalId], references: [id])
 
   @@map("vales")
+}
+
+// ─── GASTOS ADMINISTRATIVOS (fuera de planilla) ───────────────────────────
+model GastoAdmin {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int
+  descripcion String
+  monto       Decimal  @db.Decimal(10, 2)
+  periodo     String
+  fecha       DateTime @default(now())
+  creadoPor   Int
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("gastos_admin")
 }
 
 // ─── CIERRE DE TURNO DE CAJA ────────────────────────────────────────────────

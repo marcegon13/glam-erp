@@ -19,6 +19,7 @@ const MENU = [
   { key: 'vales', label: 'Vales', icon: '💰', path: '/vales', roles: ['ADMINISTRADOR', 'OFICINA'] },
   { key: 'liquidaciones', label: 'Liquidaciones', icon: '📊', path: '/liquidaciones', roles: ['ADMINISTRADOR', 'OFICINA'] },
   { key: 'produccion-diaria', label: 'Producción Diaria', icon: '📊', path: '/produccion-diaria', roles: ['ADMINISTRADOR', 'OFICINA'] },
+  { key: 'gastos-admin', label: 'Gastos Administrativos', icon: '📋', path: '/gastos-admin', roles: ['ADMINISTRADOR', 'OFICINA'] },
 ]
 
 interface LayoutProps {
