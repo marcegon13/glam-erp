@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { prisma } from '../lib/prisma.js'
+import { AuthRequest } from '../middleware/auth.js'
 
 export const registrarTenant = async (req: Request, res: Response) => {
   const { nombreNegocio, nombre, email, password } = req.body
@@ -83,5 +84,30 @@ export const login = async (req: Request, res: Response) => {
     })
   } catch {
     res.status(500).json({ error: 'Error al iniciar sesión' })
+  }
+}
+
+export const verificarPassword = async (req: AuthRequest, res: Response) => {
+  const { password } = req.body
+
+  if (!password) {
+    res.status(400).json({ error: 'Contraseña requerida' })
+    return
+  }
+
+  try {
+    const usuario = await prisma.usuario.findFirst({
+      where: { id: req.userId, tenantId: req.tenantId }
+    })
+
+    if (!usuario) {
+      res.status(404).json({ error: 'Usuario no encontrado' })
+      return
+    }
+
+    const valido = await bcrypt.compare(password, usuario.password)
+    res.json({ valido })
+  } catch {
+    res.status(500).json({ error: 'Error al verificar la contraseña' })
   }
 }

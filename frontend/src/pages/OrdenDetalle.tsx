@@ -77,6 +77,10 @@ export default function OrdenDetalle() {
   const [mensajeExito, setMensajeExito] = useState('')
   const [acreditando, setAcreditando] = useState(false)
 
+  const [modalCobro, setModalCobro] = useState(false)
+  const [password, setPassword] = useState('')
+  const [errorModal, setErrorModal] = useState('')
+
   const fetchOrden = async () => {
     try {
       const { data } = await api.get(`/ordenes/${id}`)
@@ -194,15 +198,31 @@ export default function OrdenDetalle() {
     }
   }
 
-  const handleCobrar = async () => {
+  const abrirModalCobro = () => {
+    setPassword('')
+    setErrorModal('')
+    setModalCobro(true)
+  }
+
+  const handleConfirmarCobro = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!password) return
     const metodo = METODOS_UI.find((m) => m.key === metodoUI)!.backend
+    setErrorModal('')
     setCobrando(true)
     try {
+      const { data: verificacion } = await api.post('/auth/verificar-password', { password })
+      if (!verificacion.valido) {
+        setErrorModal('Contraseña incorrecta')
+        return
+      }
+
       const { data } = await api.post(`/ordenes/${id}/cobrar`, { metodo })
       setOrden(data)
       setMensajeExito('Orden cobrada exitosamente')
+      setModalCobro(false)
     } catch {
-      setError('Error al cobrar la orden')
+      setErrorModal('Error al cobrar la orden')
     } finally {
       setCobrando(false)
     }
@@ -447,7 +467,7 @@ export default function OrdenDetalle() {
                 </div>
 
                 <button
-                  onClick={handleCobrar}
+                  onClick={abrirModalCobro}
                   disabled={cobrando || orden.items.length === 0}
                   className="w-full mt-4 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg py-2 transition-colors disabled:opacity-60"
                 >
@@ -486,6 +506,86 @@ export default function OrdenDetalle() {
           </div>
         </div>
       </div>
+
+      {modalCobro && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center px-4 z-50">
+          <div className="bg-white rounded-2xl shadow-sm border border-border w-full max-w-sm py-8 px-8">
+            <h2 className="text-lg font-bold text-text mb-6">Confirmar cobro</h2>
+
+            <div className="flex flex-col gap-2 text-sm mb-4 pb-4 border-b border-border">
+              <div className="flex justify-between">
+                <span className="text-text-muted">Cliente</span>
+                <span className="text-text">
+                  {orden.cliente.nombre} {orden.cliente.apellido}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-text-muted">Profesional</span>
+                <span className="text-text">
+                  {orden.profesional.nombre} {orden.profesional.apellido}
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-text-muted">Servicios</span>
+                {orden.items.map((item) => (
+                  <span key={item.id} className="text-text">
+                    {item.descripcion}
+                    {item.cantidad > 1 ? ` x${item.cantidad}` : ''}
+                  </span>
+                ))}
+              </div>
+              <div className="flex justify-between">
+                <span className="text-text-muted">Método</span>
+                <span className="text-text">
+                  {METODO_LABEL_LARGO[METODOS_UI.find((m) => m.key === metodoUI)!.backend]}
+                </span>
+              </div>
+              <div className="flex justify-between font-semibold">
+                <span className="text-text">Total</span>
+                <span className="text-text">{formatoMoneda(total)}</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleConfirmarCobro} className="flex flex-col">
+              <label className="text-sm font-medium text-text mb-2">
+                Confirmá tu contraseña para registrar el cobro
+              </label>
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoFocus
+                required
+                className="border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors"
+              />
+
+              {errorModal && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mt-4">
+                  {errorModal}
+                </p>
+              )}
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setModalCobro(false)}
+                  className="flex-1 border border-border text-text-muted font-medium rounded-lg py-2 transition-colors hover:bg-surface"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={cobrando}
+                  className="flex-1 bg-primary hover:bg-primary-dark text-white font-semibold rounded-lg py-2 transition-colors disabled:opacity-60"
+                >
+                  {cobrando ? 'Confirmando...' : 'Confirmar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
