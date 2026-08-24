@@ -15,6 +15,7 @@ import Vales from './pages/Vales'
 import Liquidaciones from './pages/Liquidaciones'
 import LegajoProfesional from './pages/LegajoProfesional'
 import CierreTurno from './pages/CierreTurno'
+import ProduccionDiaria from './pages/ProduccionDiaria'
 import { authStore } from './store/auth'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -187,6 +188,16 @@ export default function App() {
             <RequireAuth>
               <RequireRol roles={ADMIN_OFICINA}>
                 <LegajoProfesional />
+              </RequireRol>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/produccion-diaria"
+          element={
+            <RequireAuth>
+              <RequireRol roles={ADMIN_OFICINA}>
+                <ProduccionDiaria />
               </RequireRol>
             </RequireAuth>
           }

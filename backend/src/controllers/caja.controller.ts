@@ -74,6 +74,22 @@ export const listarCaja = async (req: AuthRequest, res: Response) => {
   }
 }
 
+export const eliminarMovimiento = async (req: AuthRequest, res: Response) => {
+  const id = Number(req.params.id)
+
+  try {
+    const movimiento = await prisma.caja.findFirst({ where: { id, tenantId: req.tenantId } })
+    if (!movimiento) {
+      res.status(404).json({ error: 'Movimiento no encontrado' })
+      return
+    }
+    await prisma.caja.delete({ where: { id } })
+    res.json({ ok: true })
+  } catch {
+    res.status(500).json({ error: 'Error al eliminar el movimiento' })
+  }
+}
+
 export const registrarMovimiento = async (req: AuthRequest, res: Response) => {
   const { tipo, metodo, monto, concepto } = req.body
 

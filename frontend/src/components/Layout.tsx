@@ -18,6 +18,7 @@ const MENU = [
   { key: 'cierre-turno', label: 'Cierre de Turno', icon: '🏦', path: '/cierre-turno', roles: ['ADMINISTRADOR', 'CAJERA'] },
   { key: 'vales', label: 'Vales', icon: '💰', path: '/vales', roles: ['ADMINISTRADOR', 'OFICINA'] },
   { key: 'liquidaciones', label: 'Liquidaciones', icon: '📊', path: '/liquidaciones', roles: ['ADMINISTRADOR', 'OFICINA'] },
+  { key: 'produccion-diaria', label: 'Producción Diaria', icon: '📊', path: '/produccion-diaria', roles: ['ADMINISTRADOR', 'OFICINA'] },
 ]
 
 interface LayoutProps {

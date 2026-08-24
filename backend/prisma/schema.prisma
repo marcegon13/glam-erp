@@ -8,25 +8,27 @@ datasource db {
 
 // ─── TENANTS ───────────────────────────────────────────────────────────────
 model Tenant {
-  id          Int      @id @default(autoincrement())
-  nombre      String
-  plan        Plan     @default(STARTER)
-  activo      Boolean  @default(true)
-  config      Json?
-  creadoEn    DateTime @default(now())
+  id       Int      @id @default(autoincrement())
+  nombre   String
+  plan     Plan     @default(STARTER)
+  activo   Boolean  @default(true)
+  config   Json?
+  creadoEn DateTime @default(now())
 
-  usuarios      Usuario[]
-  profesionales Profesional[]
-  clientes      Cliente[]
-  servicios     Servicio[]
-  ordenes       Orden[]
-  caja          Caja[]
-  liquidaciones Liquidacion[]
-  turnos        Turno[]
-  ausencias     Ausencia[]
-  fichaTrabajos FichaTrabajo[]
-  vales         Vale[]
-  turnosCaja    TurnoCaja[]
+  usuarios          Usuario[]
+  profesionales     Profesional[]
+  clientes          Cliente[]
+  servicios         Servicio[]
+  ordenes           Orden[]
+  caja              Caja[]
+  liquidaciones     Liquidacion[]
+  turnos            Turno[]
+  ausencias         Ausencia[]
+  fichaTrabajos     FichaTrabajo[]
+  vales             Vale[]
+  turnosCaja        TurnoCaja[]
+  nivelesPrecio     NivelPrecio[]
+  metodosPagoConfig MetodoPagoConfig[]
 
   @@map("tenants")
 }
@@ -39,14 +41,14 @@ enum Plan {
 
 // ─── USUARIOS ──────────────────────────────────────────────────────────────
 model Usuario {
-  id         Int      @id @default(autoincrement())
-  tenantId   Int
-  nombre     String
-  email      String
-  password   String
-  rol        Rol      @default(CAJERA)
-  activo     Boolean  @default(true)
-  creadoEn   DateTime @default(now())
+  id       Int      @id @default(autoincrement())
+  tenantId Int
+  nombre   String
+  email    String
+  password String
+  rol      Rol      @default(CAJERA)
+  activo   Boolean  @default(true)
+  creadoEn DateTime @default(now())
 
   tenant             Tenant      @relation(fields: [tenantId], references: [id])
   ordenes            Orden[]
@@ -68,15 +70,15 @@ enum Rol {
 
 // ─── PROFESIONALES ─────────────────────────────────────────────────────────
 model Profesional {
-  id            Int              @id @default(autoincrement())
-  tenantId      Int
-  nombre        String
-  apellido      String
-  tipo          TipoProfesional
-  porcentaje    Decimal?         @db.Decimal(5, 2)
-  sueldoBase    Decimal?         @db.Decimal(10, 2)
-  activo        Boolean          @default(true)
-  creadoEn      DateTime         @default(now())
+  id         Int             @id @default(autoincrement())
+  tenantId   Int
+  nombre     String
+  apellido   String
+  tipo       TipoProfesional
+  porcentaje Decimal?        @db.Decimal(5, 2)
+  sueldoBase Decimal?        @db.Decimal(10, 2)
+  activo     Boolean         @default(true)
+  creadoEn   DateTime        @default(now())
 
   tenant        Tenant        @relation(fields: [tenantId], references: [id])
   ordenes       Orden[]
@@ -96,14 +98,14 @@ enum TipoProfesional {
 
 // ─── CLIENTES ──────────────────────────────────────────────────────────────
 model Cliente {
-  id         Int      @id @default(autoincrement())
-  tenantId   Int
-  nombre     String
-  apellido   String
-  telefono   String?
-  email      String?
-  activo     Boolean  @default(true)
-  creadoEn   DateTime @default(now())
+  id       Int      @id @default(autoincrement())
+  tenantId Int
+  nombre   String
+  apellido String
+  telefono String?
+  email    String?
+  activo   Boolean  @default(true)
+  creadoEn DateTime @default(now())
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id])
   ordenes       Orden[]
@@ -129,20 +131,52 @@ model FichaTrabajo {
   @@map("ficha_trabajos")
 }
 
+// ─── NIVELES DE PRECIO ─────────────────────────────────────────────────────
+model NivelPrecio {
+  id       Int     @id @default(autoincrement())
+  tenantId Int
+  nombre   String
+  orden    Int     @default(0)
+  activo   Boolean @default(true)
+
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  precios           ServicioPrecio[]
+  metodoPagoConfigs MetodoPagoConfig[]
+
+  @@unique([tenantId, nombre])
+  @@map("niveles_precio")
+}
+
 // ─── SERVICIOS ─────────────────────────────────────────────────────────────
 model Servicio {
-  id             Int             @id @default(autoincrement())
+  id             Int          @id @default(autoincrement())
   tenantId       Int
   nombre         String
-  precioEfectivo Decimal         @db.Decimal(10, 2)
-  precioTarjeta  Decimal         @db.Decimal(10, 2)
+  // TODO(paso 3 - contraer): eliminar precioEfectivo/precioTarjeta una vez
+  // confirmado el backfill a ServicioPrecio.
+  precioEfectivo Decimal      @db.Decimal(10, 2)
+  precioTarjeta  Decimal      @db.Decimal(10, 2)
   tipo           TipoServicio
-  activo         Boolean         @default(true)
+  activo         Boolean      @default(true)
 
-  tenant Tenant       @relation(fields: [tenantId], references: [id])
-  items  OrdenItem[]
+  tenant  Tenant           @relation(fields: [tenantId], references: [id])
+  items   OrdenItem[]
+  precios ServicioPrecio[]
 
   @@map("servicios")
+}
+
+model ServicioPrecio {
+  id            Int     @id @default(autoincrement())
+  servicioId    Int
+  nivelPrecioId Int
+  precio        Decimal @db.Decimal(10, 2)
+
+  servicio    Servicio    @relation(fields: [servicioId], references: [id])
+  nivelPrecio NivelPrecio @relation(fields: [nivelPrecioId], references: [id])
+
+  @@unique([servicioId, nivelPrecioId])
+  @@map("servicio_precios")
 }
 
 enum TipoServicio {
@@ -153,13 +187,13 @@ enum TipoServicio {
 
 // ─── ORDENES ───────────────────────────────────────────────────────────────
 model Orden {
-  id            Int          @id @default(autoincrement())
+  id            Int         @id @default(autoincrement())
   tenantId      Int
   clienteId     Int
   profesionalId Int
   usuarioId     Int
-  estado        EstadoOrden  @default(ABIERTA)
-  fecha         DateTime     @default(now())
+  estado        EstadoOrden @default(ABIERTA)
+  fecha         DateTime    @default(now())
   observaciones String?
 
   tenant      Tenant      @relation(fields: [tenantId], references: [id])
@@ -193,16 +227,42 @@ model OrdenItem {
   @@map("orden_items")
 }
 
+// ─── MÉTODOS DE PAGO ───────────────────────────────────────────────────────
+// TODO(paso 3 - contraer): renombrar MetodoPagoConfig -> MetodoPago una vez
+// eliminado el enum legacy de abajo (choque de nombres hoy).
+model MetodoPagoConfig {
+  id                 Int     @id @default(autoincrement())
+  tenantId           Int
+  nombre             String
+  nivelPrecioId      Int
+  esEfectivo         Boolean @default(false)
+  acreditaAlInstante Boolean @default(true)
+  orden              Int     @default(0)
+  activo             Boolean @default(true)
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  nivelPrecio NivelPrecio @relation(fields: [nivelPrecioId], references: [id])
+  pagos       Pago[]
+  movimientos Caja[]
+
+  @@unique([tenantId, nombre])
+  @@map("metodos_pago")
+}
+
 // ─── PAGOS ─────────────────────────────────────────────────────────────────
 model Pago {
-  id          Int          @id @default(autoincrement())
-  ordenId     Int
-  metodo      MetodoPago
-  monto       Decimal      @db.Decimal(10, 2)
-  acreditado  Boolean      @default(true)
-  fecha       DateTime     @default(now())
+  id           Int        @id @default(autoincrement())
+  ordenId      Int
+  // TODO(paso 3 - contraer): eliminar `metodo` (legacy) una vez confirmado
+  // el backfill de metodoPagoId, y volver este campo NOT NULL.
+  metodo       MetodoPago
+  metodoPagoId Int?
+  monto        Decimal    @db.Decimal(10, 2)
+  acreditado   Boolean    @default(true)
+  fecha        DateTime   @default(now())
 
-  orden Orden @relation(fields: [ordenId], references: [id])
+  orden      Orden             @relation(fields: [ordenId], references: [id])
+  metodoPago MetodoPagoConfig? @relation(fields: [metodoPagoId], references: [id])
 
   @@map("pagos")
 }
@@ -216,16 +276,20 @@ enum MetodoPago {
 
 // ─── CAJA ──────────────────────────────────────────────────────────────────
 model Caja {
-  id          Int        @id @default(autoincrement())
-  tenantId    Int
-  tipo        TipoCaja
-  metodo      MetodoPago
-  monto       Decimal    @db.Decimal(10, 2)
-  concepto    String
+  id           Int        @id @default(autoincrement())
+  tenantId     Int
+  tipo         TipoCaja
+  // TODO(paso 3 - contraer): eliminar `metodo` (legacy) una vez confirmado
+  // el backfill de metodoPagoId, y volver este campo NOT NULL.
+  metodo       MetodoPago
+  metodoPagoId Int?
+  monto        Decimal    @db.Decimal(10, 2)
+  concepto     String
   referenciaId Int?
-  fecha       DateTime   @default(now())
+  fecha        DateTime   @default(now())
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant     Tenant            @relation(fields: [tenantId], references: [id])
+  metodoPago MetodoPagoConfig? @relation(fields: [metodoPagoId], references: [id])
 
   @@map("caja")
 }
@@ -243,12 +307,12 @@ model Liquidacion {
   periodo        String
   produccion     Decimal  @db.Decimal(10, 2)
   comision       Decimal  @db.Decimal(10, 2)
-  sueldoBase     Decimal  @db.Decimal(10, 2) @default(0)
-  adelantos      Decimal  @db.Decimal(10, 2) @default(0)
-  vales          Decimal  @db.Decimal(10, 2) @default(0)
-  cargasSociales Decimal  @db.Decimal(10, 2) @default(0)
-  descuentos     Decimal  @db.Decimal(10, 2) @default(0)
-  otros          Decimal  @db.Decimal(10, 2) @default(0)
+  sueldoBase     Decimal  @default(0) @db.Decimal(10, 2)
+  adelantos      Decimal  @default(0) @db.Decimal(10, 2)
+  vales          Decimal  @default(0) @db.Decimal(10, 2)
+  cargasSociales Decimal  @default(0) @db.Decimal(10, 2)
+  descuentos     Decimal  @default(0) @db.Decimal(10, 2)
+  otros          Decimal  @default(0) @db.Decimal(10, 2)
   notas          String?
   sueldoNeto     Decimal  @db.Decimal(10, 2)
   aprobada       Boolean  @default(false)
@@ -263,18 +327,18 @@ model Liquidacion {
 
 // ─── TURNOS ────────────────────────────────────────────────────────────────
 model Turno {
-  id            Int          @id @default(autoincrement())
+  id            Int         @id @default(autoincrement())
   tenantId      Int
   clienteId     Int
   profesionalId Int
-  fecha         DateTime     @db.Date
+  fecha         DateTime    @db.Date
   hora          String
   servicios     String
   observaciones String?
-  estado        EstadoTurno  @default(PENDIENTE)
+  estado        EstadoTurno @default(PENDIENTE)
   creadoPor     Int
-  creadoEn      DateTime     @default(now())
-  actualizadoEn DateTime     @updatedAt
+  creadoEn      DateTime    @default(now())
+  actualizadoEn DateTime    @updatedAt
 
   tenant      Tenant      @relation(fields: [tenantId], references: [id])
   cliente     Cliente     @relation(fields: [clienteId], references: [id])
@@ -292,12 +356,12 @@ enum EstadoTurno {
 }
 
 model Ausencia {
-  id            Int         @id @default(autoincrement())
+  id            Int      @id @default(autoincrement())
   tenantId      Int
   profesionalId Int
-  fecha         DateTime    @db.Date
+  fecha         DateTime @db.Date
   motivo        String?
-  creadoEn      DateTime    @default(now())
+  creadoEn      DateTime @default(now())
 
   tenant      Tenant      @relation(fields: [tenantId], references: [id])
   profesional Profesional @relation(fields: [profesionalId], references: [id])

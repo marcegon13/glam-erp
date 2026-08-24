@@ -7,6 +7,8 @@ function hoyUTC(): Date {
   return new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate()))
 }
 
+const METODOS_INGRESO = ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'MERCADO_PAGO'] as const
+
 async function calcularResumen(tenantId: number, turno: {
   id: number
   fondoCambio: unknown
@@ -25,28 +27,41 @@ async function calcularResumen(tenantId: number, turno: {
   const ingresos = movimientos.filter((m) => m.tipo === 'INGRESO')
   const egresos = movimientos.filter((m) => m.tipo === 'EGRESO')
 
+  const ordenIds = ingresos
+    .filter((m) => m.referenciaId != null)
+    .map((m) => m.referenciaId as number)
+  const pagos = ordenIds.length > 0
+    ? await prisma.pago.findMany({ where: { ordenId: { in: ordenIds } } })
+    : []
+  const acreditadoPorOrden = new Map(pagos.map((p) => [p.ordenId, p.acreditado]))
+
   const sumaPorMetodo = (lista: typeof movimientos, metodo: string) =>
     lista.filter((m) => m.metodo === metodo).reduce((suma, m) => suma + Number(m.monto), 0)
 
-  const porMetodo = {
-    EFECTIVO: sumaPorMetodo(ingresos, 'EFECTIVO'),
-    TARJETA: sumaPorMetodo(ingresos, 'TARJETA'),
-    TRANSFERENCIA: sumaPorMetodo(ingresos, 'TRANSFERENCIA'),
-    MERCADO_PAGO: sumaPorMetodo(ingresos, 'MERCADO_PAGO')
+  const porMetodo: Record<string, number> = {}
+  const estadoPorMetodo: Record<string, 'ACREDITADO' | 'PENDIENTE'> = {}
+  for (const metodo of METODOS_INGRESO) {
+    const lista = ingresos.filter((m) => m.metodo === metodo)
+    porMetodo[metodo] = lista.reduce((suma, m) => suma + Number(m.monto), 0)
+    const algunoPendiente = lista.some((m) => !(acreditadoPorOrden.get(m.referenciaId ?? -1) ?? true))
+    estadoPorMetodo[metodo] = algunoPendiente ? 'PENDIENTE' : 'ACREDITADO'
   }
 
   const totalIngresos = ingresos.reduce((suma, m) => suma + Number(m.monto), 0)
   const totalEgresos = egresos.reduce((suma, m) => suma + Number(m.monto), 0)
   const egresosEfectivo = sumaPorMetodo(egresos, 'EFECTIVO')
+  const egresosDetalle = egresos.map((e) => ({ id: e.id, concepto: e.concepto, monto: Number(e.monto) }))
 
   const fondoCambio = Number(turno.fondoCambio)
   const efectivoEsperado = fondoCambio + porMetodo.EFECTIVO - egresosEfectivo
 
   return {
     porMetodo,
+    estadoPorMetodo,
     totalIngresos,
     totalEgresos,
     egresosEfectivo,
+    egresosDetalle,
     fondoCambio,
     efectivoEsperado
   }
