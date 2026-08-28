@@ -99,14 +99,16 @@ enum TipoProfesional {
 
 // ─── CLIENTES ──────────────────────────────────────────────────────────────
 model Cliente {
-  id       Int      @id @default(autoincrement())
-  tenantId Int
-  nombre   String
-  apellido String
-  telefono String?
-  email    String?
-  activo   Boolean  @default(true)
-  creadoEn DateTime @default(now())
+  id           Int         @id @default(autoincrement())
+  tenantId     Int
+  nombre       String
+  apellido     String
+  telefono     String?
+  email        String?
+  tipoCliente  TipoCliente @default(EXISTENTE)
+  recomendadoPor String?
+  activo       Boolean     @default(true)
+  creadoEn     DateTime    @default(now())
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id])
   ordenes       Orden[]
@@ -114,6 +116,12 @@ model Cliente {
   fichaTrabajos FichaTrabajo[]
 
   @@map("clientes")
+}
+
+enum TipoCliente {
+  EXISTENTE
+  NUEVO
+  RECOMENDADO
 }
 
 // ─── FICHA DE TRABAJOS ─────────────────────────────────────────────────────

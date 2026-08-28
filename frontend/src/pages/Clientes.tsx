@@ -9,12 +9,21 @@ interface UltimoTrabajo {
   fecha: string
 }
 
+type TipoCliente = 'EXISTENTE' | 'NUEVO' | 'RECOMENDADO'
+
 interface Cliente {
   id: number
   nombre: string
   apellido: string
+  tipoCliente: TipoCliente
   ultimaVisita: string | null
   ultimoTrabajo: UltimoTrabajo | null
+}
+
+const TIPO_BADGE: Record<TipoCliente, { label: string; className: string } | null> = {
+  EXISTENTE: null,
+  NUEVO: { label: 'Nuevo', className: 'bg-green-50 text-green-700' },
+  RECOMENDADO: { label: 'Recomendado', className: 'bg-blue-50 text-blue-600' },
 }
 
 function hoyISO(): string {
@@ -40,6 +49,8 @@ export default function Clientes() {
   const [modalNuevo, setModalNuevo] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState('')
   const [nuevoApellido, setNuevoApellido] = useState('')
+  const [nuevoTipo, setNuevoTipo] = useState<TipoCliente>('EXISTENTE')
+  const [nuevoRecomendadoPor, setNuevoRecomendadoPor] = useState('')
   const [nuevoTrabajo, setNuevoTrabajo] = useState('')
   const [nuevoEstilista, setNuevoEstilista] = useState('')
   const [nuevaFecha, setNuevaFecha] = useState(hoyISO())
@@ -97,6 +108,8 @@ export default function Clientes() {
   const abrirModalNuevo = () => {
     setNuevoNombre('')
     setNuevoApellido('')
+    setNuevoTipo('EXISTENTE')
+    setNuevoRecomendadoPor('')
     setNuevoTrabajo('')
     setNuevoEstilista('')
     setNuevaFecha(hoyISO())
@@ -113,6 +126,9 @@ export default function Clientes() {
       const { data: cliente } = await api.post('/clientes', {
         nombre: nuevoNombre,
         apellido: nuevoApellido,
+        tipoCliente: nuevoTipo,
+        recomendadoPor:
+          nuevoTipo === 'RECOMENDADO' ? nuevoRecomendadoPor || undefined : undefined,
       })
 
       if (nuevoTrabajo.trim()) {
@@ -248,6 +264,7 @@ export default function Clientes() {
               <th className="px-5 py-3 font-medium">ID</th>
               <th className="px-5 py-3 font-medium">Nombre</th>
               <th className="px-5 py-3 font-medium">Apellido</th>
+              <th className="px-5 py-3 font-medium">Tipo</th>
               <th className="px-5 py-3 font-medium">Última Visita</th>
               <th className="px-5 py-3 font-medium">Último Trabajo</th>
               <th className="px-5 py-3 font-medium">Acciones</th>
@@ -256,13 +273,13 @@ export default function Clientes() {
           <tbody>
             {cargando ? (
               <tr>
-                <td colSpan={6} className="px-5 py-6 text-center text-text-muted">
+                <td colSpan={7} className="px-5 py-6 text-center text-text-muted">
                   Cargando...
                 </td>
               </tr>
             ) : clientes.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-6 text-center text-text-muted">
+                <td colSpan={7} className="px-5 py-6 text-center text-text-muted">
                   No hay clientes para mostrar
                 </td>
               </tr>
@@ -275,6 +292,17 @@ export default function Clientes() {
                   <td className="px-5 py-3 text-text-muted">{c.id}</td>
                   <td className="px-5 py-3 text-text font-medium">{c.nombre}</td>
                   <td className="px-5 py-3 text-text">{c.apellido}</td>
+                  <td className="px-5 py-3">
+                    {TIPO_BADGE[c.tipoCliente] ? (
+                      <span
+                        className={`text-xs font-medium px-2 py-1 rounded-full ${TIPO_BADGE[c.tipoCliente]!.className}`}
+                      >
+                        {TIPO_BADGE[c.tipoCliente]!.label}
+                      </span>
+                    ) : (
+                      <span className="text-text-muted">—</span>
+                    )}
+                  </td>
                   <td className="px-5 py-3 text-text-muted">{formatoFecha(c.ultimaVisita)}</td>
                   <td className="px-5 py-3 text-text-muted">
                     {c.ultimoTrabajo ? (
@@ -346,6 +374,31 @@ export default function Clientes() {
                   />
                 </div>
               </div>
+
+              <div className="flex flex-col mt-4">
+                <label className="text-sm font-medium text-text mb-2">Tipo de cliente</label>
+                <select
+                  value={nuevoTipo}
+                  onChange={(e) => setNuevoTipo(e.target.value as TipoCliente)}
+                  className="border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors bg-white"
+                >
+                  <option value="EXISTENTE">Existente</option>
+                  <option value="NUEVO">Nuevo/a</option>
+                  <option value="RECOMENDADO">Recomendado/a</option>
+                </select>
+              </div>
+
+              {nuevoTipo === 'RECOMENDADO' && (
+                <div className="flex flex-col mt-4">
+                  <label className="text-sm font-medium text-text mb-2">Recomendado/a por</label>
+                  <input
+                    value={nuevoRecomendadoPor}
+                    onChange={(e) => setNuevoRecomendadoPor(e.target.value)}
+                    placeholder="Nombre de quien lo recomendó"
+                    className="border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors"
+                  />
+                </div>
+              )}
 
               <div className="mt-6 pt-6 border-t border-border">
                 <h3 className="text-sm font-semibold text-text mb-4">Primer Trabajo (Opcional)</h3>

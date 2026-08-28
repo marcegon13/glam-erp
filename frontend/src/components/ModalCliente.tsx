@@ -1,12 +1,16 @@
 import { useState } from 'react'
 import api from '../api/axios'
 
+type TipoCliente = 'EXISTENTE' | 'NUEVO' | 'RECOMENDADO'
+
 interface Cliente {
   id: number
   nombre: string
   apellido: string
   telefono: string | null
   email: string | null
+  tipoCliente?: TipoCliente
+  recomendadoPor?: string | null
 }
 
 interface Props {
@@ -15,13 +19,21 @@ interface Props {
   onSaved: (cliente: Cliente) => void
 }
 
+const OPCIONES_TIPO: { value: TipoCliente; label: string }[] = [
+  { value: 'EXISTENTE', label: 'Cliente existente (buscar en el sistema)' },
+  { value: 'NUEVO', label: 'Cliente nuevo' },
+  { value: 'RECOMENDADO', label: 'Cliente recomendado/a' },
+]
+
 export default function ModalCliente({ cliente, onClose, onSaved }: Props) {
   const editando = !!cliente
 
+  const [tipoCliente, setTipoCliente] = useState<TipoCliente>(cliente?.tipoCliente ?? 'EXISTENTE')
   const [nombre, setNombre] = useState(cliente?.nombre ?? '')
   const [apellido, setApellido] = useState(cliente?.apellido ?? '')
   const [telefono, setTelefono] = useState(cliente?.telefono ?? '')
   const [email, setEmail] = useState(cliente?.email ?? '')
+  const [recomendadoPor, setRecomendadoPor] = useState(cliente?.recomendadoPor ?? '')
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
 
@@ -35,12 +47,22 @@ export default function ModalCliente({ cliente, onClose, onSaved }: Props) {
       apellido,
       telefono: telefono || undefined,
       email: email || undefined,
+      tipoCliente,
+      recomendadoPor: tipoCliente === 'RECOMENDADO' ? recomendadoPor || undefined : undefined,
     }
 
     try {
       if (editando) {
         await api.put(`/clientes/${cliente.id}`, body)
-        onSaved({ id: cliente.id, nombre, apellido, telefono: telefono || null, email: email || null })
+        onSaved({
+          id: cliente.id,
+          nombre,
+          apellido,
+          telefono: telefono || null,
+          email: email || null,
+          tipoCliente,
+          recomendadoPor: recomendadoPor || null,
+        })
       } else {
         const { data } = await api.post('/clientes', body)
         onSaved(data)
@@ -61,7 +83,24 @@ export default function ModalCliente({ cliente, onClose, onSaved }: Props) {
         </h2>
 
         <form onSubmit={handleSubmit} className="flex flex-col">
-          <div className="flex flex-col">
+          {!editando && (
+            <div className="flex flex-col">
+              <label className="text-sm font-medium text-text mb-2">Tipo de cliente</label>
+              <select
+                value={tipoCliente}
+                onChange={(e) => setTipoCliente(e.target.value as TipoCliente)}
+                className="border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors bg-white"
+              >
+                {OPCIONES_TIPO.map((op) => (
+                  <option key={op.value} value={op.value}>
+                    {op.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className={`flex flex-col ${editando ? '' : 'mt-4'}`}>
             <label className="text-sm font-medium text-text mb-2">Nombre</label>
             <input
               value={nombre}
@@ -101,6 +140,18 @@ export default function ModalCliente({ cliente, onClose, onSaved }: Props) {
               className="border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors"
             />
           </div>
+
+          {!editando && tipoCliente === 'RECOMENDADO' && (
+            <div className="flex flex-col mt-4">
+              <label className="text-sm font-medium text-text mb-2">Recomendado por</label>
+              <input
+                value={recomendadoPor ?? ''}
+                onChange={(e) => setRecomendadoPor(e.target.value)}
+                placeholder="Nombre de quien lo recomendó"
+                className="border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors"
+              />
+            </div>
+          )}
 
           {error && (
             <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mt-4">

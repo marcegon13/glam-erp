@@ -144,13 +144,17 @@ export const obtenerFicha = async (req: AuthRequest, res: Response) => {
   }
 }
 
+const TIPOS_CLIENTE = ['EXISTENTE', 'NUEVO', 'RECOMENDADO'] as const
+
 export const crearCliente = async (req: AuthRequest, res: Response) => {
-  const { nombre, apellido, telefono, email } = req.body
+  const { nombre, apellido, telefono, email, tipoCliente, recomendadoPor } = req.body
 
   if (!nombre || !apellido) {
     res.status(400).json({ error: 'Nombre y apellido son requeridos' })
     return
   }
+
+  const tipo = TIPOS_CLIENTE.includes(tipoCliente) ? tipoCliente : 'EXISTENTE'
 
   try {
     const cliente = await prisma.cliente.create({
@@ -159,7 +163,9 @@ export const crearCliente = async (req: AuthRequest, res: Response) => {
         nombre,
         apellido,
         telefono,
-        email
+        email,
+        tipoCliente: tipo,
+        recomendadoPor: tipo === 'RECOMENDADO' ? recomendadoPor || null : null
       }
     })
 
