@@ -45,7 +45,6 @@ const FILAS_INGRESOS: { key: keyof Resumen['porMetodo']; label: string }[] = [
   { key: 'TARJETA_DEBITO', label: 'Tarjeta Débito' },
   { key: 'TARJETA_CREDITO', label: 'Tarjeta Crédito' },
   { key: 'MERCADO_PAGO', label: 'Mercado Pago' },
-  { key: 'TRANSFERENCIA', label: 'Transferencia' },
 ]
 
 const FONDO_CAMBIO_DEFAULT = 5000
@@ -78,13 +77,11 @@ function Fila({
   valor,
   negrita,
   className = '',
-  signo,
 }: {
   label: React.ReactNode
   valor: number
   negrita?: boolean
   className?: string
-  signo?: '−' | '+'
 }) {
   return (
     <tr className={`border-b border-border last:border-0 ${className}`}>
@@ -92,7 +89,6 @@ function Fila({
         {label}
       </td>
       <td className={`px-4 py-2 text-right tabular-nums ${negrita ? 'font-bold text-text' : 'text-text'}`}>
-        {signo && <span className="text-text-muted mr-0.5">{signo}</span>}
         {formatoMoneda(valor)}
       </td>
     </tr>
@@ -351,7 +347,7 @@ export default function CierreTurno() {
                 <Fila key={fila.key} label={fila.label} valor={r.porMetodo[fila.key] ?? 0} />
               ))}
               <Fila
-                label={<span className="italic">Debe (pendiente de acreditación)</span>}
+                label="Pendiente de acreditación"
                 valor={r.debe}
                 className="bg-amber-50/60"
               />
@@ -410,7 +406,7 @@ export default function CierreTurno() {
                       <button
                         onClick={handleAgregarEgreso}
                         disabled={guardandoEgreso || !nuevoConcepto.trim() || !nuevoMonto}
-                        className="bg-primary hover:bg-primary-dark text-white font-semibold rounded-lg w-10 h-[38px] flex items-center justify-center transition-colors disabled:opacity-60 shrink-0"
+                        className="bg-primary hover:bg-primary-dark text-white font-semibold rounded-lg w-10 h-9.5 flex items-center justify-center transition-colors disabled:opacity-60 shrink-0"
                         title="Agregar egreso"
                       >
                         +
@@ -422,14 +418,14 @@ export default function CierreTurno() {
               )}
               <Fila label="TOTAL EGRESOS" valor={r.totalEgresos} negrita className="bg-[#FAFAFC]" />
 
-              {/* RESUMEN FINAL */}
-              <SeccionHeader>Resumen final</SeccionHeader>
-              <Fila label="Fondo de cambio inicial" valor={r.fondoCambio} />
-              <Fila label="Total ingresos efectivo" valor={r.porMetodo.EFECTIVO} signo="+" />
-              <Fila label="Total egresos efectivo" valor={r.egresosEfectivo} signo="−" />
+              {/* ARQUEO */}
+              <SeccionHeader>Arqueo</SeccionHeader>
+              <Fila label="Fondo de cambio" valor={r.fondoCambio} />
+              <Fila label="+ Ingresos efectivo" valor={r.porMetodo.EFECTIVO} />
+              <Fila label="− Egresos efectivo" valor={r.egresosEfectivo} />
               <tr className="border-b border-border last:border-0 bg-[#EDE9FE]">
                 <td className="px-4 py-3 font-bold text-primary tracking-wide" colSpan={2}>
-                  EFECTIVO NETO EN CAJA
+                  = EFECTIVO NETO EN CAJA
                 </td>
                 <td className="px-4 py-3 text-right font-bold text-primary text-lg tabular-nums">
                   {formatoMoneda(efectivoNeto)}
