@@ -3,7 +3,6 @@ import Layout from '../components/Layout'
 import api from '../api/axios'
 
 type TipoTurno = 'MANIANA' | 'TARDE'
-type EstadoAcreditacion = 'ACREDITADO' | 'PENDIENTE'
 
 interface Turno {
   id: number
@@ -24,13 +23,10 @@ interface Resumen {
     TARJETA: number
     TRANSFERENCIA: number
     MERCADO_PAGO: number
+    TARJETA_DEBITO: number
+    TARJETA_CREDITO: number
   }
-  estadoPorMetodo: {
-    EFECTIVO: EstadoAcreditacion
-    TARJETA: EstadoAcreditacion
-    TRANSFERENCIA: EstadoAcreditacion
-    MERCADO_PAGO: EstadoAcreditacion
-  }
+  debe: number
   totalIngresos: number
   totalEgresos: number
   egresosEfectivo: number
@@ -44,205 +40,66 @@ const TIPO_LABEL: Record<TipoTurno, string> = {
   TARDE: 'Tarde',
 }
 
-const FILAS_INGRESOS: { key: 'EFECTIVO' | 'TARJETA' | 'MERCADO_PAGO'; label: string }[] = [
+const FILAS_INGRESOS: { key: keyof Resumen['porMetodo']; label: string }[] = [
   { key: 'EFECTIVO', label: 'Efectivo' },
-  { key: 'TARJETA', label: 'Tarjeta' },
+  { key: 'TARJETA_DEBITO', label: 'Tarjeta Débito' },
+  { key: 'TARJETA_CREDITO', label: 'Tarjeta Crédito' },
   { key: 'MERCADO_PAGO', label: 'Mercado Pago' },
+  { key: 'TRANSFERENCIA', label: 'Transferencia' },
 ]
 
 const FONDO_CAMBIO_DEFAULT = 5000
 
 const formatoMoneda = (valor: number) => `$${valor.toLocaleString('es-AR')}`
+const formatoDif = (valor: number) =>
+  `${valor > 0 ? '+' : valor < 0 ? '−' : ''}$${Math.abs(valor).toLocaleString('es-AR')}`
 const formatoHora = (fecha: string) =>
   new Date(fecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
 const formatoFecha = (fecha: string) =>
   new Date(fecha).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
-function EstadoBadge({ estado }: { estado: EstadoAcreditacion }) {
+/* ── Piezas de la planilla ─────────────────────────────────────────────── */
+
+function SeccionHeader({ children }: { children: React.ReactNode }) {
   return (
-    <span
-      className={`text-xs font-medium px-2 py-1 rounded-full ${
-        estado === 'ACREDITADO' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-600'
-      }`}
-    >
-      {estado === 'ACREDITADO' ? 'Acreditado' : 'Pendiente'}
-    </span>
+    <tr>
+      <td
+        colSpan={3}
+        className="bg-[#F1F0F7] text-[#1A1A2E] font-bold tracking-wide text-xs uppercase px-4 py-2 border-y border-border"
+      >
+        {children}
+      </td>
+    </tr>
   )
 }
 
-function SeccionIngresos({ resumen }: { resumen: Resumen }) {
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-border p-6">
-      <h3 className="font-semibold text-text mb-4">1. Ingresos</h3>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-text-muted border-b border-border">
-            <th className="py-2 font-medium">Método</th>
-            <th className="py-2 font-medium text-right">Monto</th>
-            <th className="py-2 font-medium text-right">Estado</th>
-          </tr>
-        </thead>
-        <tbody>
-          {FILAS_INGRESOS.map((fila) => (
-            <tr key={fila.key} className="border-b border-border last:border-0">
-              <td className="py-2 text-text">{fila.label}</td>
-              <td className="py-2 text-text text-right">{formatoMoneda(resumen.porMetodo[fila.key])}</td>
-              <td className="py-2 text-right">
-                <EstadoBadge estado={resumen.estadoPorMetodo[fila.key]} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr className="border-t-2 border-border font-semibold">
-            <td className="py-2 text-text">Total Ingresos</td>
-            <td className="py-2 text-text text-right" colSpan={2}>
-              {formatoMoneda(resumen.totalIngresos)}
-            </td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  )
-}
-
-function SeccionEgresos({
-  resumen,
-  onEliminar,
-  eliminandoId,
+function Fila({
+  label,
+  valor,
+  negrita,
+  className = '',
+  signo,
 }: {
-  resumen: Resumen
-  onEliminar?: (id: number) => void
-  eliminandoId?: number | null
+  label: React.ReactNode
+  valor: number
+  negrita?: boolean
+  className?: string
+  signo?: '−' | '+'
 }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-border p-6">
-      <h3 className="font-semibold text-text mb-4">2. Egresos</h3>
-      {resumen.egresosDetalle.length === 0 ? (
-        <p className="text-sm text-text-muted">Sin egresos registrados en este turno</p>
-      ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-text-muted border-b border-border">
-              <th className="py-2 font-medium">Concepto</th>
-              <th className="py-2 font-medium text-right">Monto</th>
-              {onEliminar && <th className="py-2 font-medium text-right w-8"></th>}
-            </tr>
-          </thead>
-          <tbody>
-            {resumen.egresosDetalle.map((egreso) => (
-              <tr key={egreso.id} className="border-b border-border last:border-0">
-                <td className="py-2 text-text">{egreso.concepto}</td>
-                <td className="py-2 text-text text-right">{formatoMoneda(egreso.monto)}</td>
-                {onEliminar && (
-                  <td className="py-2 text-right">
-                    <button
-                      onClick={() => onEliminar(egreso.id)}
-                      disabled={eliminandoId === egreso.id}
-                      title="Eliminar egreso"
-                      className="text-text-muted hover:text-red-600 transition-colors disabled:opacity-40"
-                    >
-                      ✕
-                    </button>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="border-t-2 border-border font-semibold">
-              <td className="py-2 text-text">Total Egresos</td>
-              <td className="py-2 text-text text-right" colSpan={onEliminar ? 2 : 1}>
-                {formatoMoneda(resumen.totalEgresos)}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      )}
-    </div>
+    <tr className={`border-b border-border last:border-0 ${className}`}>
+      <td className={`px-4 py-2 ${negrita ? 'font-bold text-text' : 'text-text-muted'}`} colSpan={2}>
+        {label}
+      </td>
+      <td className={`px-4 py-2 text-right tabular-nums ${negrita ? 'font-bold text-text' : 'text-text'}`}>
+        {signo && <span className="text-text-muted mr-0.5">{signo}</span>}
+        {formatoMoneda(valor)}
+      </td>
+    </tr>
   )
 }
 
-function RegistrarEgresoForm({
-  concepto,
-  monto,
-  onChangeConcepto,
-  onChangeMonto,
-  onSubmit,
-  guardando,
-  error,
-}: {
-  concepto: string
-  monto: string
-  onChangeConcepto: (v: string) => void
-  onChangeMonto: (v: string) => void
-  onSubmit: () => void
-  guardando: boolean
-  error: string
-}) {
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-border p-6">
-      <h3 className="font-semibold text-text mb-4">Registrar Egreso</h3>
-      <div className="flex gap-3 items-start">
-        <input
-          value={concepto}
-          onChange={(e) => onChangeConcepto(e.target.value)}
-          placeholder="Ej: Pago proveedor, Compra insumos..."
-          className="flex-1 border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors text-sm"
-        />
-        <input
-          type="number"
-          value={monto}
-          onChange={(e) => onChangeMonto(e.target.value)}
-          placeholder="$"
-          className="w-32 border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors text-sm"
-        />
-        <button
-          onClick={onSubmit}
-          disabled={guardando || !concepto.trim() || !monto}
-          className="bg-primary hover:bg-primary-dark text-white font-semibold rounded-lg w-10 h-9.5 flex items-center justify-center transition-colors disabled:opacity-60"
-          title="Registrar egreso"
-        >
-          +
-        </button>
-      </div>
-      {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
-    </div>
-  )
-}
-
-function FilasCalculadas({ resumen }: { resumen: Resumen }) {
-  return (
-    <div className="flex flex-col gap-2 text-sm">
-      <div className="flex justify-between">
-        <span className="text-text-muted">Fondo de cambio inicial</span>
-        <span className="text-text">{formatoMoneda(resumen.fondoCambio)}</span>
-      </div>
-      <div className="flex justify-between">
-        <span className="text-text-muted">+ Ingresos en efectivo</span>
-        <span className="text-text">{formatoMoneda(resumen.porMetodo.EFECTIVO)}</span>
-      </div>
-      <div className="flex justify-between">
-        <span className="text-text-muted">- Egresos en efectivo</span>
-        <span className="text-text">-{formatoMoneda(resumen.egresosEfectivo)}</span>
-      </div>
-      <div className="flex justify-between pt-2 border-t border-border">
-        <span className="font-bold text-primary">= Efectivo esperado en caja</span>
-        <span className="font-bold text-primary text-lg">{formatoMoneda(resumen.efectivoEsperado)}</span>
-      </div>
-    </div>
-  )
-}
-
-function DiferenciaBox({ diferencia }: { diferencia: number }) {
-  const positiva = diferencia >= 0
-  return (
-    <div className={`flex items-center justify-between mt-4 rounded-lg px-3 py-3 ${positiva ? 'bg-green-50' : 'bg-red-50'}`}>
-      <p className={`text-sm font-medium ${positiva ? 'text-green-700' : 'text-red-600'}`}>Diferencia</p>
-      <p className={`text-lg font-bold ${positiva ? 'text-green-700' : 'text-red-600'}`}>{formatoMoneda(diferencia)}</p>
-    </div>
-  )
-}
+/* ── Página ────────────────────────────────────────────────────────────── */
 
 export default function CierreTurno() {
   const [cargando, setCargando] = useState(true)
@@ -392,64 +249,8 @@ export default function CierreTurno() {
     )
   }
 
-  // Vista: recibo del turno recién cerrado
-  if (cierreFinal) {
-    const { turno: t, resumen: r } = cierreFinal
-    return (
-      <Layout titulo="Cierre de Turno">
-        <div className="max-w-2xl mx-auto flex flex-col gap-6" id="recibo-turno">
-          <div className="bg-white rounded-2xl shadow-sm border border-border p-6">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="font-semibold text-text">Planilla de Cierre de Caja</h2>
-              <button
-                onClick={() => window.print()}
-                className="text-xs font-medium text-primary hover:text-primary-dark transition-colors"
-              >
-                🖨️ Imprimir
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-text-muted">
-              <span>Fecha: {formatoFecha(t.abiertaEn)}</span>
-              <span>
-                Hora: {formatoHora(t.abiertaEn)} - {t.cerradaEn && formatoHora(t.cerradaEn)}
-              </span>
-              <span>Cajera: {t.cajera}</span>
-              <span>Turno: {TIPO_LABEL[t.tipo]}</span>
-            </div>
-          </div>
-
-          <SeccionIngresos resumen={r} />
-          <SeccionEgresos resumen={r} />
-
-          <div className="bg-white rounded-2xl shadow-sm border border-border p-6">
-            <h3 className="font-semibold text-text mb-4">3. Arqueo de Efectivo</h3>
-            <FilasCalculadas resumen={r} />
-            <div className="flex justify-between mt-4 pt-4 border-t border-border text-sm font-medium">
-              <span className="text-text">Efectivo contado</span>
-              <span className="text-text">{formatoMoneda(Number(t.efectivoContado))}</span>
-            </div>
-            <DiferenciaBox diferencia={Number(t.diferencia)} />
-            {t.observaciones && (
-              <div className="flex justify-between mt-4 pt-4 border-t border-border text-sm">
-                <span className="text-text-muted">Observaciones</span>
-                <span className="text-text">{t.observaciones}</span>
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={handleVolver}
-            className="border border-border text-text font-medium rounded-lg py-2 transition-colors hover:bg-surface"
-          >
-            Volver
-          </button>
-        </div>
-      </Layout>
-    )
-  }
-
-  // Vista: no hay turno abierto -> abrir uno nuevo
-  if (!turno) {
+  /* ── Vista: no hay turno abierto → apertura ──────────────────────────── */
+  if (!turno && !cierreFinal) {
     return (
       <Layout titulo="Cierre de Turno">
         <div className="max-w-md mx-auto bg-white rounded-2xl shadow-sm border border-border p-6">
@@ -506,14 +307,29 @@ export default function CierreTurno() {
     )
   }
 
-  // Vista: turno abierto -> planilla en vivo + cierre
+  /* ── Datos de la planilla (turno abierto o recién cerrado) ───────────── */
+  const t = (turno ?? cierreFinal!.turno)
+  const r = (resumen ?? cierreFinal!.resumen)
+  const soloLectura = !turno
+  const efectivoNeto = r.efectivoEsperado
+  const contadoNum = soloLectura ? Number(t.efectivoContado) : Number(efectivoContado)
+  const diferencia = soloLectura
+    ? Number(t.diferencia)
+    : diferenciaPreview
+  const cuadra = diferencia === 0
+
   return (
     <Layout titulo="Cierre de Turno">
-      <div className="max-w-2xl mx-auto flex flex-col gap-6">
-        <div className="flex items-center justify-between">
+      <div className="max-w-2xl mx-auto flex flex-col gap-4">
+        {/* Encabezado de la planilla */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="inline-flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full bg-[#EDE9FE] text-primary">
-            {turno.tipo === 'MANIANA' ? '☀️' : '🌙'} Turno {TIPO_LABEL[turno.tipo]} · {turno.cajera} · desde{' '}
-            {formatoHora(turno.abiertaEn)} · Fondo {formatoMoneda(Number(turno.fondoCambio))}
+            {t.tipo === 'MANIANA' ? '☀️' : '🌙'} Turno {TIPO_LABEL[t.tipo]}
+            {soloLectura && ' · Cerrado'}
+          </span>
+          <span className="text-sm text-text-muted">
+            {formatoFecha(t.abiertaEn)} · {t.cajera} · {formatoHora(t.abiertaEn)}
+            {t.cerradaEn && ` – ${formatoHora(t.cerradaEn)}`}
           </span>
         </div>
 
@@ -521,50 +337,170 @@ export default function CierreTurno() {
           <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
         )}
 
-        {resumen && (
-          <>
-            <SeccionIngresos resumen={resumen} />
+        {/* Planilla */}
+        <div className="bg-white rounded-2xl shadow-sm border border-border overflow-hidden">
+          <div className="px-4 py-3 border-b border-border">
+            <h2 className="font-bold text-text tracking-wide">PLANILLA DE CAJA</h2>
+          </div>
 
-            <RegistrarEgresoForm
-              concepto={nuevoConcepto}
-              monto={nuevoMonto}
-              onChangeConcepto={setNuevoConcepto}
-              onChangeMonto={setNuevoMonto}
-              onSubmit={handleAgregarEgreso}
-              guardando={guardandoEgreso}
-              error={errorEgreso}
-            />
+          <table className="w-full text-sm">
+            <tbody>
+              {/* INGRESOS */}
+              <SeccionHeader>Ingresos</SeccionHeader>
+              {FILAS_INGRESOS.map((fila) => (
+                <Fila key={fila.key} label={fila.label} valor={r.porMetodo[fila.key] ?? 0} />
+              ))}
+              <Fila
+                label={<span className="italic">Debe (pendiente de acreditación)</span>}
+                valor={r.debe}
+                className="bg-amber-50/60"
+              />
+              <Fila label="TOTAL INGRESOS" valor={r.totalIngresos} negrita className="bg-[#FAFAFC]" />
 
-            <SeccionEgresos resumen={resumen} onEliminar={handleEliminarEgreso} eliminandoId={eliminandoId} />
+              {/* EGRESOS */}
+              <SeccionHeader>Egresos</SeccionHeader>
+              {r.egresosDetalle.length === 0 && !soloLectura && (
+                <tr className="border-b border-border">
+                  <td colSpan={3} className="px-4 py-2 text-text-muted italic">
+                    Sin egresos registrados en este turno
+                  </td>
+                </tr>
+              )}
+              {r.egresosDetalle.map((egreso) => (
+                <tr key={egreso.id} className="border-b border-border">
+                  <td className="px-4 py-2 text-text-muted" colSpan={2}>
+                    {egreso.concepto}
+                  </td>
+                  <td className="px-4 py-2 text-right tabular-nums text-text">
+                    <span className="inline-flex items-center gap-2 justify-end">
+                      {formatoMoneda(egreso.monto)}
+                      {!soloLectura && (
+                        <button
+                          onClick={() => handleEliminarEgreso(egreso.id)}
+                          disabled={eliminandoId === egreso.id}
+                          title="Eliminar egreso"
+                          className="text-text-muted hover:text-red-600 transition-colors disabled:opacity-40"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </span>
+                  </td>
+                </tr>
+              ))}
 
-            <div className="bg-white rounded-2xl shadow-sm border border-border p-6">
-              <h3 className="font-semibold text-text mb-4">3. Arqueo de Efectivo</h3>
-              <FilasCalculadas resumen={resumen} />
+              {/* Alta rápida de egreso */}
+              {!soloLectura && (
+                <tr className="border-b border-border bg-[#FAFAFC]">
+                  <td colSpan={3} className="px-4 py-3">
+                    <div className="flex gap-2 items-start">
+                      <input
+                        value={nuevoConcepto}
+                        onChange={(e) => setNuevoConcepto(e.target.value)}
+                        placeholder="Concepto del egreso"
+                        className="flex-1 border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors text-sm"
+                      />
+                      <input
+                        type="number"
+                        value={nuevoMonto}
+                        onChange={(e) => setNuevoMonto(e.target.value)}
+                        placeholder="$"
+                        className="w-28 border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors text-sm"
+                      />
+                      <button
+                        onClick={handleAgregarEgreso}
+                        disabled={guardandoEgreso || !nuevoConcepto.trim() || !nuevoMonto}
+                        className="bg-primary hover:bg-primary-dark text-white font-semibold rounded-lg w-10 h-[38px] flex items-center justify-center transition-colors disabled:opacity-60 shrink-0"
+                        title="Agregar egreso"
+                      >
+                        +
+                      </button>
+                    </div>
+                    {errorEgreso && <p className="text-sm text-red-600 mt-2">{errorEgreso}</p>}
+                  </td>
+                </tr>
+              )}
+              <Fila label="TOTAL EGRESOS" valor={r.totalEgresos} negrita className="bg-[#FAFAFC]" />
 
-              <div className="flex flex-col mt-4">
-                <label className="text-sm font-medium text-text mb-2">Efectivo contado $</label>
+              {/* RESUMEN FINAL */}
+              <SeccionHeader>Resumen final</SeccionHeader>
+              <Fila label="Fondo de cambio inicial" valor={r.fondoCambio} />
+              <Fila label="Total ingresos efectivo" valor={r.porMetodo.EFECTIVO} signo="+" />
+              <Fila label="Total egresos efectivo" valor={r.egresosEfectivo} signo="−" />
+              <tr className="border-b border-border last:border-0 bg-[#EDE9FE]">
+                <td className="px-4 py-3 font-bold text-primary tracking-wide" colSpan={2}>
+                  EFECTIVO NETO EN CAJA
+                </td>
+                <td className="px-4 py-3 text-right font-bold text-primary text-lg tabular-nums">
+                  {formatoMoneda(efectivoNeto)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Arqueo */}
+          <div className="px-4 py-4 border-t border-border flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-4">
+              <label className="text-sm font-medium text-text">Efectivo contado físicamente $</label>
+              {soloLectura ? (
+                <span className="text-sm font-medium text-text tabular-nums">{formatoMoneda(contadoNum)}</span>
+              ) : (
                 <input
                   type="number"
                   value={efectivoContado}
                   onChange={(e) => setEfectivoContado(e.target.value)}
-                  className="border border-border rounded-lg px-3 py-2 outline-none focus:border-primary transition-colors"
+                  placeholder="0"
+                  className="w-40 border border-border rounded-lg px-3 py-2 text-right outline-none focus:border-primary transition-colors"
                 />
-              </div>
-
-              {diferenciaPreview !== null && <DiferenciaBox diferencia={diferenciaPreview} />}
+              )}
             </div>
 
+            {diferencia !== null && (efectivoContado !== '' || soloLectura) && (
+              <div
+                className={`flex items-center justify-between rounded-lg px-3 py-2 ${
+                  cuadra ? 'bg-green-50' : 'bg-red-50'
+                }`}
+              >
+                <span className={`text-sm font-medium ${cuadra ? 'text-green-700' : 'text-red-600'}`}>
+                  {cuadra ? 'Caja cuadrada' : 'Diferencia'}
+                </span>
+                <span className={`text-base font-bold tabular-nums ${cuadra ? 'text-green-700' : 'text-red-600'}`}>
+                  {formatoDif(diferencia)}
+                </span>
+              </div>
+            )}
+
+            {soloLectura && t.observaciones && (
+              <p className="text-sm text-text-muted">
+                <span className="font-medium text-text">Observaciones: </span>
+                {t.observaciones}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Acciones */}
+        <div className="flex justify-end">
+          {soloLectura ? (
+            <button
+              onClick={handleVolver}
+              className="border border-border text-text font-medium rounded-lg px-5 py-2.5 transition-colors hover:bg-surface"
+            >
+              Volver
+            </button>
+          ) : (
             <button
               onClick={abrirModalCierre}
               disabled={efectivoContado === ''}
-              className="bg-primary hover:bg-primary-dark text-white font-semibold rounded-lg py-3 transition-colors disabled:opacity-60"
+              className="bg-primary hover:bg-primary-dark text-white font-semibold rounded-lg px-6 py-2.5 transition-colors disabled:opacity-60"
             >
               Cerrar Turno
             </button>
-          </>
-        )}
+          )}
+        </div>
       </div>
 
+      {/* Modal de confirmación */}
       {modalCierre && resumen && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center px-4 z-50 overflow-y-auto py-8">
           <div className="bg-white rounded-2xl shadow-sm border border-border w-full max-w-md py-8 px-8">
@@ -572,23 +508,45 @@ export default function CierreTurno() {
 
             <div className="flex flex-col gap-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-text-muted">Total Ingresos</span>
-                <span className="text-text font-medium">{formatoMoneda(resumen.totalIngresos)}</span>
+                <span className="text-text-muted">Total ingresos</span>
+                <span className="text-text font-medium tabular-nums">{formatoMoneda(resumen.totalIngresos)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-text-muted">Total Egresos</span>
-                <span className="text-text font-medium">{formatoMoneda(resumen.totalEgresos)}</span>
+                <span className="text-text-muted">Total egresos</span>
+                <span className="text-text font-medium tabular-nums">{formatoMoneda(resumen.totalEgresos)}</span>
               </div>
-              <div className="border-t border-border pt-2 mt-1">
-                <FilasCalculadas resumen={resumen} />
+              <div className="flex justify-between pt-2 border-t border-border">
+                <span className="font-bold text-primary">Efectivo neto en caja</span>
+                <span className="font-bold text-primary tabular-nums">{formatoMoneda(resumen.efectivoEsperado)}</span>
               </div>
-              <div className="flex justify-between pt-2 border-t border-border font-medium">
-                <span className="text-text">Efectivo contado</span>
-                <span className="text-text">{formatoMoneda(Number(efectivoContado))}</span>
+              <div className="flex justify-between">
+                <span className="text-text-muted">Efectivo contado</span>
+                <span className="text-text font-medium tabular-nums">{formatoMoneda(Number(efectivoContado))}</span>
               </div>
             </div>
 
-            {diferenciaPreview !== null && <DiferenciaBox diferencia={diferenciaPreview} />}
+            {diferenciaPreview !== null && (
+              <div
+                className={`flex items-center justify-between rounded-lg px-3 py-2 mt-3 ${
+                  diferenciaPreview === 0 ? 'bg-green-50' : 'bg-red-50'
+                }`}
+              >
+                <span
+                  className={`text-sm font-medium ${
+                    diferenciaPreview === 0 ? 'text-green-700' : 'text-red-600'
+                  }`}
+                >
+                  {diferenciaPreview === 0 ? 'Caja cuadrada' : 'Diferencia'}
+                </span>
+                <span
+                  className={`text-base font-bold tabular-nums ${
+                    diferenciaPreview === 0 ? 'text-green-700' : 'text-red-600'
+                  }`}
+                >
+                  {formatoDif(diferenciaPreview)}
+                </span>
+              </div>
+            )}
 
             <div className="flex flex-col mt-4">
               <label className="text-sm font-medium text-text mb-2">

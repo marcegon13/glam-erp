@@ -1,25 +1,95 @@
+import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { authStore } from '../store/auth'
 
-const MENU = [
+type Item = {
+  key: string
+  label: string
+  path: string
+  roles: string[]
+  // Para rutas dinámicas (ej. /clientes/:id) que no matchean por igualdad exacta.
+  match?: (pathname: string) => boolean
+}
+
+const itemActivo = (item: Item, pathname: string) =>
+  item.match ? item.match(pathname) : pathname === item.path
+
+type Grupo = {
+  key: string
+  label: string
+  icon: string
+  items: Item[]
+}
+
+const TODOS = ['ADMINISTRADOR', 'CAJERA', 'OFICINA', 'ESTILISTA', 'MANICURA']
+const ADMIN_CAJERA = ['ADMINISTRADOR', 'CAJERA']
+const ADMIN_CAJERA_OFICINA = ['ADMINISTRADOR', 'CAJERA', 'OFICINA']
+const ADMIN_OFICINA = ['ADMINISTRADOR', 'OFICINA']
+const SOLO_ADMIN = ['ADMINISTRADOR']
+
+const GRUPOS: Grupo[] = [
   {
-    key: 'inicio',
-    label: 'Inicio',
+    key: 'operacion',
+    label: 'Operación',
     icon: '🏠',
-    path: '/dashboard',
-    roles: ['ADMINISTRADOR', 'CAJERA', 'OFICINA', 'ESTILISTA', 'MANICURA'],
+    items: [
+      { key: 'inicio', label: 'Inicio', path: '/dashboard', roles: TODOS },
+      { key: 'recepcion', label: 'Recepción', path: '/recepcion', roles: ADMIN_CAJERA },
+      { key: 'turnos', label: 'Turnos', path: '/turnos', roles: ADMIN_CAJERA },
+    ],
   },
-  { key: 'recepcion', label: 'Recepción', icon: '🗓️', path: '/recepcion', roles: ['ADMINISTRADOR', 'CAJERA'] },
-  { key: 'turnos', label: 'Turnos', icon: '📅', path: '/turnos', roles: ['ADMINISTRADOR', 'CAJERA'] },
-  { key: 'clientes', label: 'Clientes', icon: '👥', path: '/clientes', roles: ['ADMINISTRADOR', 'CAJERA', 'OFICINA'] },
-  { key: 'profesionales', label: 'Profesionales', icon: '💇', path: '/profesionales', roles: ['ADMINISTRADOR'] },
-  { key: 'servicios', label: 'Servicios', icon: '✨', path: '/servicios', roles: ['ADMINISTRADOR'] },
-  { key: 'caja', label: 'Caja', icon: '💰', path: '/caja', roles: ['ADMINISTRADOR', 'CAJERA', 'OFICINA'] },
-  { key: 'cierre-turno', label: 'Cierre de Turno', icon: '🏦', path: '/cierre-turno', roles: ['ADMINISTRADOR', 'CAJERA'] },
-  { key: 'vales', label: 'Vales', icon: '💰', path: '/vales', roles: ['ADMINISTRADOR', 'OFICINA'] },
-  { key: 'liquidaciones', label: 'Liquidaciones', icon: '📊', path: '/liquidaciones', roles: ['ADMINISTRADOR', 'OFICINA'] },
-  { key: 'produccion-diaria', label: 'Producción Diaria', icon: '📊', path: '/produccion-diaria', roles: ['ADMINISTRADOR', 'OFICINA'] },
-  { key: 'gastos-admin', label: 'Gastos Administrativos', icon: '📋', path: '/gastos-admin', roles: ['ADMINISTRADOR', 'OFICINA'] },
+  {
+    key: 'clientes',
+    label: 'Clientes',
+    icon: '👥',
+    items: [
+      { key: 'clientes', label: 'Clientes', path: '/clientes', roles: ADMIN_CAJERA_OFICINA },
+      {
+        key: 'fichero',
+        label: 'Fichero',
+        path: '/clientes',
+        roles: ADMIN_CAJERA_OFICINA,
+        match: (p) => /^\/clientes\/[^/]+$/.test(p),
+      },
+    ],
+  },
+  {
+    key: 'caja',
+    label: 'Caja',
+    icon: '💰',
+    items: [
+      { key: 'caja', label: 'Caja', path: '/caja', roles: ADMIN_CAJERA_OFICINA },
+      { key: 'cierre-turno', label: 'Cierre de Turno', path: '/cierre-turno', roles: ADMIN_CAJERA },
+    ],
+  },
+  {
+    key: 'produccion',
+    label: 'Producción',
+    icon: '📊',
+    items: [
+      { key: 'produccion-diaria', label: 'Producción Diaria', path: '/produccion-diaria', roles: ADMIN_OFICINA },
+      { key: 'liquidaciones', label: 'Liquidaciones', path: '/liquidaciones', roles: ADMIN_OFICINA },
+      { key: 'vales', label: 'Vales', path: '/vales', roles: ADMIN_OFICINA },
+    ],
+  },
+  {
+    key: 'administracion',
+    label: 'Administración',
+    icon: '🏛️',
+    items: [
+      { key: 'gastos-admin', label: 'Gastos Administrativos', path: '/gastos-admin', roles: ADMIN_OFICINA },
+    ],
+  },
+  {
+    key: 'configuracion',
+    label: 'Configuración',
+    icon: '⚙️',
+    items: [
+      { key: 'profesionales', label: 'Profesionales', path: '/profesionales', roles: SOLO_ADMIN },
+      { key: 'servicios', label: 'Servicios', path: '/servicios', roles: SOLO_ADMIN },
+      { key: 'usuarios', label: 'Gestión de Usuarios', path: '/usuarios', roles: SOLO_ADMIN },
+    ],
+  },
 ]
 
 interface LayoutProps {
@@ -33,7 +103,38 @@ export default function Layout({ titulo, children }: LayoutProps) {
   const usuario = authStore.getUser()
   const rol = usuario?.rol
 
-  const menuVisible = MENU.filter((item) => !rol || item.roles.includes(rol))
+  const gruposVisibles = GRUPOS.map((grupo) => ({
+    ...grupo,
+    items: grupo.items.filter((item) => !rol || item.roles.includes(rol)),
+  })).filter((grupo) => grupo.items.length > 0)
+
+  const grupoDeRuta = gruposVisibles.find((grupo) =>
+    grupo.items.some((item) => itemActivo(item, location.pathname))
+  )?.key
+
+  const [abiertos, setAbiertos] = useState<Set<string>>(
+    () => new Set(grupoDeRuta ? [grupoDeRuta] : [])
+  )
+
+  useEffect(() => {
+    if (grupoDeRuta) {
+      setAbiertos((prev) => {
+        if (prev.has(grupoDeRuta)) return prev
+        const next = new Set(prev)
+        next.add(grupoDeRuta)
+        return next
+      })
+    }
+  }, [grupoDeRuta])
+
+  const toggleGrupo = (key: string) => {
+    setAbiertos((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   const handleSalir = () => {
     authStore.clear()
@@ -49,21 +150,54 @@ export default function Layout({ titulo, children }: LayoutProps) {
         </div>
 
         <nav className="flex flex-col gap-1 px-3">
-          {menuVisible.map((item) => {
-            const activo = location.pathname === item.path
+          {gruposVisibles.map((grupo) => {
+            const expandido = abiertos.has(grupo.key)
             return (
-              <button
-                key={item.key}
-                onClick={() => navigate(item.path)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-left transition-colors ${
-                  activo
-                    ? 'bg-[#EDE9FE] text-[#7C3AED]'
-                    : 'text-[#6B6B80] hover:bg-[#F8F8FC]'
-                }`}
-              >
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
+              <div key={grupo.key}>
+                <button
+                  onClick={() => toggleGrupo(grupo.key)}
+                  aria-expanded={expandido}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold text-left text-[#1A1A2E] hover:bg-[#F8F8FC] transition-colors"
+                >
+                  <span>{grupo.icon}</span>
+                  <span className="flex-1">{grupo.label}</span>
+                  <span
+                    className={`text-[10px] text-[#6B6B80] transition-transform duration-200 ${
+                      expandido ? 'rotate-90' : ''
+                    }`}
+                  >
+                    ▶
+                  </span>
+                </button>
+
+                <div
+                  className={`grid transition-all duration-200 ease-in-out ${
+                    expandido ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+                  }`}
+                >
+                  <div className="overflow-hidden">
+                    <div className="flex flex-col gap-1 py-1">
+                      {grupo.items.map((item) => {
+                        const activo = itemActivo(item, location.pathname)
+                        return (
+                          <button
+                            key={item.key}
+                            onClick={() => navigate(item.path)}
+                            style={{ paddingLeft: 'calc(0.75rem + 12px)' }}
+                            className={`flex items-center gap-2 pr-3 py-2 rounded-lg text-sm font-medium text-left transition-colors ${
+                              activo
+                                ? 'bg-[#EDE9FE] text-[#7C3AED]'
+                                : 'text-[#6B6B80] hover:bg-[#F8F8FC]'
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
             )
           })}
         </nav>

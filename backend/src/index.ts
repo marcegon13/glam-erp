@@ -17,6 +17,7 @@ import dashboardRoutes from './routes/dashboard.routes.js'
 import turnosCajaRoutes from './routes/turnos-caja.routes.js'
 import produccionRoutes from './routes/produccion.routes.js'
 import gastosAdminRoutes from './routes/gastos-admin.routes.js'
+import usuariosRoutes from './routes/usuarios.routes.js'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -43,6 +44,7 @@ app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/turnos-caja', turnosCajaRoutes)
 app.use('/api/produccion', produccionRoutes)
 app.use('/api/gastos-admin', gastosAdminRoutes)
+app.use('/api/usuarios', usuariosRoutes)
 
 const archivarTurnosAlIniciar = async () => {
   try {

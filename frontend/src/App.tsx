@@ -17,6 +17,7 @@ import LegajoProfesional from './pages/LegajoProfesional'
 import CierreTurno from './pages/CierreTurno'
 import ProduccionDiaria from './pages/ProduccionDiaria'
 import GastosAdmin from './pages/GastosAdmin'
+import Usuarios from './pages/Usuarios'
 import { authStore } from './store/auth'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -209,6 +210,16 @@ export default function App() {
             <RequireAuth>
               <RequireRol roles={ADMIN_OFICINA}>
                 <GastosAdmin />
+              </RequireRol>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/usuarios"
+          element={
+            <RequireAuth>
+              <RequireRol roles={SOLO_ADMIN}>
+                <Usuarios />
               </RequireRol>
             </RequireAuth>
           }

@@ -21,7 +21,8 @@ async function calcularResumen(tenantId: number, turno: {
     where: {
       tenantId,
       fecha: { gte: turno.abiertaEn, lte: hasta }
-    }
+    },
+    include: { metodoPago: true }
   })
 
   const ingresos = movimientos.filter((m) => m.tipo === 'INGRESO')
@@ -47,6 +48,24 @@ async function calcularResumen(tenantId: number, turno: {
     estadoPorMetodo[metodo] = algunoPendiente ? 'PENDIENTE' : 'ACREDITADO'
   }
 
+  // Desglose de tarjeta en débito / crédito según el nombre del método de pago
+  // configurado (la tarjeta genérica cae en crédito por defecto).
+  const esAcreditado = (m: (typeof ingresos)[number]) =>
+    acreditadoPorOrden.get(m.referenciaId ?? -1) ?? true
+  const tarjetas = ingresos.filter((m) => m.metodo === 'TARJETA')
+  let tarjetaDebito = 0
+  let tarjetaCredito = 0
+  for (const m of tarjetas) {
+    const nombre = (m.metodoPago?.nombre ?? '').toLowerCase()
+    if (nombre.includes('débito') || nombre.includes('debito')) tarjetaDebito += Number(m.monto)
+    else tarjetaCredito += Number(m.monto)
+  }
+  porMetodo.TARJETA_DEBITO = tarjetaDebito
+  porMetodo.TARJETA_CREDITO = tarjetaCredito
+
+  // "Debe": ingresos del turno que todavía no están acreditados.
+  const debe = ingresos.filter((m) => !esAcreditado(m)).reduce((suma, m) => suma + Number(m.monto), 0)
+
   const totalIngresos = ingresos.reduce((suma, m) => suma + Number(m.monto), 0)
   const totalEgresos = egresos.reduce((suma, m) => suma + Number(m.monto), 0)
   const egresosEfectivo = sumaPorMetodo(egresos, 'EFECTIVO')
@@ -58,6 +77,7 @@ async function calcularResumen(tenantId: number, turno: {
   return {
     porMetodo,
     estadoPorMetodo,
+    debe,
     totalIngresos,
     totalEgresos,
     egresosEfectivo,
