@@ -1,6 +1,6 @@
 import { Response } from 'express'
 import bcrypt from 'bcryptjs'
-import { Rol } from '@prisma/client'
+import { Rol } from '../../generated/prisma/index.js'
 import { prisma } from '../lib/prisma.js'
 import { AuthRequest } from '../middleware/auth.js'
 

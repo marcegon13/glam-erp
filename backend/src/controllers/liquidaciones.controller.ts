@@ -62,7 +62,7 @@ async function valesPendientesDelPeriodo(tenantId: number, profesionalId: number
 }
 
 export const resumenPeriodo = async (req: AuthRequest, res: Response) => {
-  const { periodo } = req.params
+  const { periodo } = req.params as { periodo: string }
 
   try {
     const profesionales = await prisma.profesional.findMany({
@@ -109,7 +109,7 @@ export const resumenPeriodo = async (req: AuthRequest, res: Response) => {
 
 export const obtenerLegajo = async (req: AuthRequest, res: Response) => {
   const profesionalId = Number(req.params.profesionalId)
-  const { periodo } = req.params
+  const { periodo } = req.params as { periodo: string }
 
   try {
     const profesional = await prisma.profesional.findFirst({

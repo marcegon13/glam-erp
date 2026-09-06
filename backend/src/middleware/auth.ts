@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
-import { Rol } from '@prisma/client'
+import { Rol } from '../../generated/prisma/index.js'
 
 export interface AuthRequest extends Request {
   userId?: number
