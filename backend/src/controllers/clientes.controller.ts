@@ -175,6 +175,74 @@ export const crearCliente = async (req: AuthRequest, res: Response) => {
   }
 }
 
+export const importarClientes = async (req: AuthRequest, res: Response) => {
+  const filas = Array.isArray(req.body) ? req.body : req.body?.clientes
+
+  if (!Array.isArray(filas) || filas.length === 0) {
+    res.status(400).json({ error: 'Se esperaba un array de clientes' })
+    return
+  }
+
+  const creados: { nombre: string; apellido: string }[] = []
+  const omitidos: { fila: number; motivo: string }[] = []
+
+  try {
+    for (let i = 0; i < filas.length; i++) {
+      const fila = filas[i] ?? {}
+      const nombre = String(fila.nombre ?? '').trim()
+      const apellido = String(fila.apellido ?? '').trim()
+      const telefono = String(fila.telefono ?? '').trim() || null
+      const email = String(fila.email ?? '').trim() || null
+      const tipoRaw = String(fila.tipoCliente ?? fila.tipo_cliente ?? '').trim().toUpperCase()
+      const tipoCliente = TIPOS_CLIENTE.includes(tipoRaw as (typeof TIPOS_CLIENTE)[number])
+        ? (tipoRaw as (typeof TIPOS_CLIENTE)[number])
+        : 'EXISTENTE'
+      const recomendadoPor = String(fila.recomendadoPor ?? fila.recomendado_por ?? '').trim() || null
+
+      if (!nombre || !apellido) {
+        omitidos.push({ fila: i + 1, motivo: 'Nombre y apellido son requeridos' })
+        continue
+      }
+
+      const existente = await prisma.cliente.findFirst({
+        where: {
+          tenantId: req.tenantId,
+          nombre: { equals: nombre, mode: 'insensitive' },
+          apellido: { equals: apellido, mode: 'insensitive' }
+        }
+      })
+
+      if (existente) {
+        omitidos.push({ fila: i + 1, motivo: `Ya existe: ${nombre} ${apellido}` })
+        continue
+      }
+
+      await prisma.cliente.create({
+        data: {
+          tenantId: req.tenantId!,
+          nombre,
+          apellido,
+          telefono,
+          email,
+          tipoCliente,
+          recomendadoPor: tipoCliente === 'RECOMENDADO' ? recomendadoPor : null
+        }
+      })
+
+      creados.push({ nombre, apellido })
+    }
+
+    res.status(201).json({
+      total: filas.length,
+      creados: creados.length,
+      omitidos: omitidos.length,
+      detalleOmitidos: omitidos
+    })
+  } catch {
+    res.status(500).json({ error: 'Error al importar clientes' })
+  }
+}
+
 export const obtenerCliente = async (req: AuthRequest, res: Response) => {
   const id = Number(req.params.id)
 

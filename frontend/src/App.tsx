@@ -18,6 +18,7 @@ import CierreTurno from './pages/CierreTurno'
 import ProduccionDiaria from './pages/ProduccionDiaria'
 import GastosAdmin from './pages/GastosAdmin'
 import Usuarios from './pages/Usuarios'
+import Importar from './pages/Importar'
 import { authStore } from './store/auth'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -220,6 +221,16 @@ export default function App() {
             <RequireAuth>
               <RequireRol roles={SOLO_ADMIN}>
                 <Usuarios />
+              </RequireRol>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/importar"
+          element={
+            <RequireAuth>
+              <RequireRol roles={SOLO_ADMIN}>
+                <Importar />
               </RequireRol>
             </RequireAuth>
           }

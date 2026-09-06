@@ -7,6 +7,7 @@ type Item = {
   label: string
   path: string
   roles: string[]
+  icon?: string
   // Para rutas dinámicas (ej. /clientes/:id) que no matchean por igualdad exacta.
   match?: (pathname: string) => boolean
 }
@@ -88,6 +89,7 @@ const GRUPOS: Grupo[] = [
       { key: 'profesionales', label: 'Profesionales', path: '/profesionales', roles: SOLO_ADMIN },
       { key: 'servicios', label: 'Servicios', path: '/servicios', roles: SOLO_ADMIN },
       { key: 'usuarios', label: 'Gestión de Usuarios', path: '/usuarios', roles: SOLO_ADMIN },
+      { key: 'importar', label: 'Importar Datos', path: '/importar', roles: SOLO_ADMIN, icon: '📥' },
     ],
   },
 ]
@@ -190,6 +192,7 @@ export default function Layout({ titulo, children }: LayoutProps) {
                                 : 'text-[#6B6B80] hover:bg-[#F8F8FC]'
                             }`}
                           >
+                            {item.icon && <span>{item.icon}</span>}
                             {item.label}
                           </button>
                         )

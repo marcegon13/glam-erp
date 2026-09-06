@@ -1,9 +1,10 @@
 import { Router } from 'express'
-import { authMiddleware } from '../middleware/auth.js'
+import { authMiddleware, requireRol } from '../middleware/auth.js'
 import {
   listarClientes,
   buscarAvanzado,
   crearCliente,
+  importarClientes,
   obtenerCliente,
   obtenerFicha,
   editarCliente,
@@ -16,6 +17,7 @@ router.use(authMiddleware)
 
 router.get('/', listarClientes)
 router.post('/', crearCliente)
+router.post('/importar', requireRol('ADMINISTRADOR'), importarClientes)
 router.get('/buscar', buscarAvanzado)
 router.get('/:id/ficha', obtenerFicha)
 router.get('/:id', obtenerCliente)

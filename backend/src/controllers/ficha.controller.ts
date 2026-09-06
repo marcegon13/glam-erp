@@ -66,6 +66,74 @@ export const editarUltimoTrabajo = async (req: AuthRequest, res: Response) => {
   }
 }
 
+export const importarTrabajos = async (req: AuthRequest, res: Response) => {
+  const filas = Array.isArray(req.body) ? req.body : req.body?.trabajos
+
+  if (!Array.isArray(filas) || filas.length === 0) {
+    res.status(400).json({ error: 'Se esperaba un array de trabajos' })
+    return
+  }
+
+  const creados: number[] = []
+  const omitidos: { fila: number; motivo: string }[] = []
+
+  try {
+    for (let i = 0; i < filas.length; i++) {
+      const fila = filas[i] ?? {}
+      const nombreCliente = String(fila.nombreCliente ?? fila.nombre_cliente ?? '').trim()
+      const apellidoCliente = String(fila.apellidoCliente ?? fila.apellido_cliente ?? '').trim()
+      const trabajoRealizado = String(fila.trabajoRealizado ?? fila.trabajo_realizado ?? '').trim()
+      const estilista = String(fila.estilista ?? '').trim()
+      const fechaStr = String(fila.fecha ?? '').trim()
+
+      if (!nombreCliente || !apellidoCliente || !trabajoRealizado || !estilista || !fechaStr) {
+        omitidos.push({ fila: i + 1, motivo: 'Faltan campos requeridos' })
+        continue
+      }
+
+      const fecha = new Date(`${fechaStr}T00:00:00.000Z`)
+      if (isNaN(fecha.getTime())) {
+        omitidos.push({ fila: i + 1, motivo: `Fecha inválida: ${fechaStr}` })
+        continue
+      }
+
+      const cliente = await prisma.cliente.findFirst({
+        where: {
+          tenantId: req.tenantId,
+          nombre: { equals: nombreCliente, mode: 'insensitive' },
+          apellido: { equals: apellidoCliente, mode: 'insensitive' }
+        }
+      })
+
+      if (!cliente) {
+        omitidos.push({ fila: i + 1, motivo: `Cliente no encontrado: ${nombreCliente} ${apellidoCliente}` })
+        continue
+      }
+
+      const trabajo = await prisma.fichaTrabajo.create({
+        data: {
+          tenantId: req.tenantId!,
+          clienteId: cliente.id,
+          trabajoRealizado,
+          estilista,
+          fecha
+        }
+      })
+
+      creados.push(trabajo.id)
+    }
+
+    res.status(201).json({
+      total: filas.length,
+      creados: creados.length,
+      omitidos: omitidos.length,
+      detalleOmitidos: omitidos
+    })
+  } catch {
+    res.status(500).json({ error: 'Error al importar trabajos' })
+  }
+}
+
 export const listarTrabajos = async (req: AuthRequest, res: Response) => {
   const clienteId = Number(req.params.clienteId)
 
