@@ -23,7 +23,13 @@ import stockRoutes from './routes/stock.routes.js' // stock module v1
 const app = express()
 const PORT = process.env.PORT || 3000
 
-app.use(cors())
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'https://glam-erp.vercel.app'
+  ],
+  credentials: true
+}))
 app.use(express.json())
 
 app.get('/health', (req, res) => {
