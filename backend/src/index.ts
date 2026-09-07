@@ -24,10 +24,17 @@ const app = express()
 const PORT = process.env.PORT || 3000
 
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://glam-erp.vercel.app'
-  ],
+  origin: (origin, callback) => {
+    const allowed = [
+      'http://localhost:5173',
+      'https://glam-erp.vercel.app'
+    ]
+    if (!origin || allowed.includes(origin) || origin.endsWith('.vercel.app')) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
   credentials: true
 }))
 app.use(express.json())
