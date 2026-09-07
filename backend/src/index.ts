@@ -18,7 +18,7 @@ import turnosCajaRoutes from './routes/turnos-caja.routes.js'
 import produccionRoutes from './routes/produccion.routes.js'
 import gastosAdminRoutes from './routes/gastos-admin.routes.js'
 import usuariosRoutes from './routes/usuarios.routes.js'
-import stockRoutes from './routes/stock.routes.js'
+import stockRoutes from './routes/stock.routes.js' // stock module v1
 
 const app = express()
 const PORT = process.env.PORT || 3000
