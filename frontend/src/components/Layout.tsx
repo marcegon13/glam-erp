@@ -26,6 +26,7 @@ const TODOS = ['ADMINISTRADOR', 'CAJERA', 'OFICINA', 'ESTILISTA', 'MANICURA']
 const ADMIN_CAJERA = ['ADMINISTRADOR', 'CAJERA']
 const ADMIN_CAJERA_OFICINA = ['ADMINISTRADOR', 'CAJERA', 'OFICINA']
 const ADMIN_OFICINA = ['ADMINISTRADOR', 'OFICINA']
+const ADMIN_DEPOSITO = ['ADMINISTRADOR', 'DEPOSITO']
 const SOLO_ADMIN = ['ADMINISTRADOR']
 
 const GRUPOS: Grupo[] = [
@@ -79,6 +80,14 @@ const GRUPOS: Grupo[] = [
     icon: '🏛️',
     items: [
       { key: 'gastos-admin', label: 'Gastos Administrativos', path: '/gastos-admin', roles: ADMIN_OFICINA },
+    ],
+  },
+  {
+    key: 'deposito',
+    label: 'Depósito',
+    icon: '📦',
+    items: [
+      { key: 'stock', label: 'Stock', path: '/stock', roles: ADMIN_DEPOSITO },
     ],
   },
   {

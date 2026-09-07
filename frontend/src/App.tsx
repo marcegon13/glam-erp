@@ -19,6 +19,7 @@ import ProduccionDiaria from './pages/ProduccionDiaria'
 import GastosAdmin from './pages/GastosAdmin'
 import Usuarios from './pages/Usuarios'
 import Importar from './pages/Importar'
+import Stock from './pages/Stock'
 import { authStore } from './store/auth'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -39,6 +40,7 @@ function RequireRol({ roles, children }: { roles: string[]; children: React.Reac
 const ADMIN_CAJERA = ['ADMINISTRADOR', 'CAJERA']
 const ADMIN_CAJERA_OFICINA = ['ADMINISTRADOR', 'CAJERA', 'OFICINA']
 const ADMIN_OFICINA = ['ADMINISTRADOR', 'OFICINA']
+const ADMIN_DEPOSITO = ['ADMINISTRADOR', 'DEPOSITO']
 const SOLO_ADMIN = ['ADMINISTRADOR']
 
 export default function App() {
@@ -231,6 +233,16 @@ export default function App() {
             <RequireAuth>
               <RequireRol roles={SOLO_ADMIN}>
                 <Importar />
+              </RequireRol>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/stock"
+          element={
+            <RequireAuth>
+              <RequireRol roles={ADMIN_DEPOSITO}>
+                <Stock />
               </RequireRol>
             </RequireAuth>
           }

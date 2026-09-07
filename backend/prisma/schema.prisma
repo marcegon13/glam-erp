@@ -68,6 +68,7 @@ enum Rol {
   OFICINA
   ESTILISTA
   MANICURA
+  DEPOSITO
 }
 
 // ─── PROFESIONALES ─────────────────────────────────────────────────────────
@@ -100,16 +101,16 @@ enum TipoProfesional {
 
 // ─── CLIENTES ──────────────────────────────────────────────────────────────
 model Cliente {
-  id           Int         @id @default(autoincrement())
-  tenantId     Int
-  nombre       String
-  apellido     String
-  telefono     String?
-  email        String?
-  tipoCliente  TipoCliente @default(EXISTENTE)
+  id             Int         @id @default(autoincrement())
+  tenantId       Int
+  nombre         String
+  apellido       String
+  telefono       String?
+  email          String?
+  tipoCliente    TipoCliente @default(EXISTENTE)
   recomendadoPor String?
-  activo       Boolean     @default(true)
-  creadoEn     DateTime    @default(now())
+  activo         Boolean     @default(true)
+  creadoEn       DateTime    @default(now())
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id])
   ordenes       Orden[]
@@ -445,4 +446,97 @@ enum TipoTurno {
 enum EstadoTurnoCaja {
   ABIERTO
   CERRADO
+}
+
+// ─── STOCK / DEPÓSITO ──────────────────────────────────────────────────────
+model Producto {
+  id             Int      @id @default(autoincrement())
+  tenantId       Int
+  nombre         String
+  marca          String
+  unidad         String // gr | ml | unidad | litro
+  precioUnitario Decimal  @db.Decimal(10, 2)
+  stockMinimo    Int      @default(0)
+  activo         Boolean  @default(true)
+  creadoEn       DateTime @default(now())
+
+  stockDeposito    StockDeposito[]
+  stockLaboratorio StockLaboratorio[]
+  movimientos      MovimientoStock[]
+  pedidos          PedidoStock[]
+
+  @@map("productos")
+}
+
+model StockDeposito {
+  id            Int      @id @default(autoincrement())
+  tenantId      Int
+  productoId    Int
+  cantidad      Decimal  @db.Decimal(12, 3)
+  actualizadoEn DateTime @updatedAt
+
+  producto Producto @relation(fields: [productoId], references: [id])
+
+  @@unique([tenantId, productoId])
+  @@map("stock_deposito")
+}
+
+model StockLaboratorio {
+  id            Int      @id @default(autoincrement())
+  tenantId      Int
+  productoId    Int
+  cantidad      Decimal  @db.Decimal(12, 3)
+  fecha         DateTime @db.Date
+  actualizadoEn DateTime @updatedAt
+
+  producto Producto @relation(fields: [productoId], references: [id])
+
+  @@unique([tenantId, productoId, fecha])
+  @@map("stock_laboratorio")
+}
+
+enum MovimientoTipo {
+  COMPRA
+  SALIDA_LABORATORIO
+  DEVOLUCION
+  AJUSTE
+}
+
+model MovimientoStock {
+  id         Int            @id @default(autoincrement())
+  tenantId   Int
+  productoId Int
+  tipo       MovimientoTipo
+  cantidad   Decimal        @db.Decimal(12, 3)
+  origen     String // depósito | laboratorio
+  concepto   String?
+  creadoPor  Int
+  creadoEn   DateTime       @default(now())
+
+  producto Producto @relation(fields: [productoId], references: [id])
+
+  @@map("movimientos_stock")
+}
+
+enum EstadoPedido {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
+model PedidoStock {
+  id            Int          @id @default(autoincrement())
+  tenantId      Int
+  productoId    Int
+  cantidad      Decimal      @db.Decimal(12, 3)
+  motivo        String?
+  estado        EstadoPedido @default(PENDIENTE)
+  creadoPor     Int
+  autorizadoPor Int?
+  creadoEn      DateTime     @default(now())
+  actualizadoEn DateTime     @updatedAt
+
+  producto Producto @relation(fields: [productoId], references: [id])
+
+  @@map("pedidos_stock")
 }
